@@ -1,0 +1,20 @@
+{
+  "comment": "Doc-only mirror of tests/fixtures/vni_cases.rs — NOT loaded at runtime.",
+  "cases": [
+    { "method": "vni", "keys": "a1", "output": "á", "label": "tone sac" },
+    { "method": "vni", "keys": "d9", "output": "đ", "label": "stroke d9" },
+    { "method": "vni", "keys": "hoa2", "output": "hoà", "label": "reposition hoa2" },
+    { "method": "vni", "keys": "a11", "output": "a", "label": "revert tone a11" },
+    { "method": "vni", "keys": "vie5t", "output": "việt", "label": "complex vie5t" },
+    { "method": "vni", "keys": "truo7ng", "output": "trương", "label": "complex truo7ng" },
+    { "method": "vni", "keys": "ngu7o7i2", "output": "người", "label": "complex ngu7o7i2" }
+  ],
+  "word_cases": [
+    {
+      "method": "vni",
+      "words": "xin1 chao2 ban5",
+      "output": "xín chào bạn",
+      "label": "multi-word xin1 chao2 ban5"
+    }
+  ]
+}
