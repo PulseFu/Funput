@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/funput-core"]
+members = ["crates/funput-core", "crates/funput-engine"]
 
 [workspace.package]
 version = "0.1.0"

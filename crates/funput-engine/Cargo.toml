@@ -1,0 +1,7 @@
+[package]
+name = "funput-engine"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+funput-core = { path = "../funput-core" }

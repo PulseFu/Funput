@@ -34,11 +34,14 @@ pub enum Action {
 
 pub struct ImeResult {
     pub action: Action,
-    pub backspace: u8,       // Số ký tự cần xóa trong app
-    pub chars: [u32; 32],    // UTF-32 output
-    pub count: u8,           // Số ký tự output hợp lệ
+    pub backspace: usize,    // Số ký tự cần xóa trong app
+    pub output: String,      // Chuỗi inject sau khi xóa
 }
 ```
+
+`ImeResult` là kiểu Rust-native. `funput-ffi` mới marshal sang struct `#[repr(C)]`
+(`backspace: u8`, `chars: [u32; 32]`, `count: u8`) ở biên FFI — giới hạn 32 ký tự /
+`u8` và chính sách tràn nằm ở đó, không ở engine.
 
 Platform đọc `ImeResult` rồi quyết định **cách inject** (Backspace, Selection, AX-sync) — logic inject **không** nằm trong crate này.
 
@@ -61,15 +64,18 @@ Platform đọc `ImeResult` rồi quyết định **cách inject** (Backspace, S
 
 Platform nhận bước 2: xóa 1 ký tự, inject `á`, nuốt key `s`.
 
-## Cấu trúc module (dự kiến)
+## Cấu trúc module (hiện tại — E0)
 
 ```
 funput-engine/src/
-├── lib.rs
-├── session.rs            # Trạng thái session (enabled, method, buffer)
-├── pipeline.rs           # Key → core → ImeResult
-└── result.rs             # Action, ImeResult
+├── lib.rs                # Engine, re-exports
+├── result.rs             # Action, ImeResult
+├── session.rs            # enabled, method, buffer
+├── pipeline.rs           # stub — E1
+└── diff.rs               # stub — E1
 ```
+
+Integration tests (`tests/telex_steps.rs`, …) — E1+.
 
 ## Phụ thuộc
 
@@ -87,10 +93,15 @@ funput-engine → funput-core
 
 Platform macOS/Windows **không** import trực tiếp — đi qua `funput-ffi`.
 
+## Hiện thực
+
+Xem [IMPLEMENTATION.md](./IMPLEMENTATION.md) — roadmap theo phase E0–E4.
+
 ## Tests
 
 ```bash
 cargo test -p funput-engine
+cargo clippy -p funput-engine -- -D warnings
 ```
 
-Integration test: mô phỏng chuỗi key → kiểm tra chuỗi `ImeResult` (action, backspace, chars) — không cần CGEvent.
+**E0:** `process_char` stub trả `Action::None`; pipeline/diff implement ở E1.

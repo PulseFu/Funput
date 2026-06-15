@@ -1,0 +1,62 @@
+//! IME session state — enabled flag, input method, composition buffer.
+
+use funput_core::InputMethod;
+
+/// Mutable session held by [`crate::Engine`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Session {
+    pub enabled: bool,
+    pub method: InputMethod,
+    /// Composed text currently shown in the app (the composition span).
+    pub buffer: String,
+    /// Raw keystrokes since the last word boundary. Lets English restore
+    /// (phase E3) rebuild the original Latin text when a word is not valid
+    /// Vietnamese (`mas` → `má`, but Space restores `mas`).
+    pub keys: String,
+}
+
+impl Session {
+    pub fn new() -> Self {
+        Self {
+            enabled: true,
+            method: InputMethod::Telex,
+            buffer: String::new(),
+            keys: String::new(),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.buffer.clear();
+        self.keys.clear();
+    }
+}
+
+impl Default for Session {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_defaults() {
+        let session = Session::new();
+        assert!(session.enabled);
+        assert_eq!(session.method, InputMethod::Telex);
+        assert!(session.buffer.is_empty());
+        assert!(session.keys.is_empty());
+    }
+
+    #[test]
+    fn clear_resets_buffer_and_keys() {
+        let mut session = Session::new();
+        session.buffer.push('á');
+        session.keys.push_str("as");
+        session.clear();
+        assert!(session.buffer.is_empty());
+        assert!(session.keys.is_empty());
+    }
+}
