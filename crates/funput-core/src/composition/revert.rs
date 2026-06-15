@@ -1,8 +1,7 @@
 //! VNI revert helpers — double modifier key removes one layer (Cách A).
 
-use crate::unicode::marks::{
-    shape_on_vowel, shaped_vowel_index, strip_shape, tone_on_vowel, vowel_stem, Tone, VowelShape,
-};
+use crate::unicode::marks::{tone_on_vowel, vowel_stem, Tone};
+use crate::unicode::shapes::{shape_on_vowel, shaped_vowel_index, strip_shape, VowelShape};
 use crate::unicode::tone_position::tone_vowel_index;
 
 pub(crate) fn replace_char_at(buffer: &str, char_idx: usize, new_ch: char) -> String {

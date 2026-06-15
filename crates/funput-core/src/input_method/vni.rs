@@ -1,31 +1,15 @@
-//! VNI key classification.
+//! VNI key classification — digit modifiers map to a shared [`KeyAction`].
 //!
-//! ## Revert (Cách A — gõ đúp số)
-//!
-//! Gõ lại **cùng phím modifier** trên đúng mục tiêu → bỏ **một lớp** modifier:
-//!
-//! | Chuỗi gõ | Kết quả | Ghi chú |
-//! |----------|---------|---------|
-//! | `a11` | `a` | Bỏ sắc |
-//! | `a66` | `a` | Bỏ mũ |
-//! | `d99` | `d` | Bỏ gạch ngang |
-//! | `a611` | `â` | Bỏ sắc, giữ mũ |
-//! | `a12` | `à` | Khác tone → thay tone, không revert |
-//! | `hoa22` | `hoa` | Bỏ huyền trên `a` |
-//! | `uo77` | `uo` | Bỏ móc compound `ươ` |
-//!
-//! Trả `TransformKind::Reverted` khi revert thành công.
+//! | Key | Action |
+//! |-----|--------|
+//! | `1`–`5` | tone: sắc, huyền, hỏi, ngã, nặng |
+//! | `6`–`8` | shape: mũ (â/ê/ô), móc (ơ/ư), trần (ă) |
+//! | `9` | stroke: `đ` |
+//! | other | normal character |
 
-use crate::unicode::marks::{Tone, VowelShape};
-
-/// Action implied by a VNI keystroke.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VniKeyAction {
-    Stroke,
-    Tone(Tone),
-    Shape(VowelShape),
-    Normal,
-}
+use crate::input_method::KeyAction;
+use crate::unicode::marks::Tone;
+use crate::unicode::shapes::VowelShape;
 
 /// Map digit keys 1–5 to tone marks.
 pub fn tone_from_digit(key: char) -> Option<Tone> {
@@ -49,13 +33,13 @@ pub fn shape_from_digit(key: char) -> Option<VowelShape> {
     }
 }
 
-/// Classify a VNI keystroke.
-pub fn classify_key(key: char) -> VniKeyAction {
+/// Classify a VNI keystroke into a method-agnostic [`KeyAction`].
+pub fn classify_key(key: char) -> KeyAction {
     match key {
-        '9' => VniKeyAction::Stroke,
-        '1'..='5' => VniKeyAction::Tone(tone_from_digit(key).expect("digit 1-5")),
-        '6'..='8' => VniKeyAction::Shape(shape_from_digit(key).expect("digit 6-8")),
-        _ => VniKeyAction::Normal,
+        '9' => KeyAction::Stroke,
+        '1'..='5' => KeyAction::Tone(tone_from_digit(key).expect("digit 1-5")),
+        '6'..='8' => KeyAction::Shape(shape_from_digit(key).expect("digit 6-8")),
+        _ => KeyAction::Normal,
     }
 }
 
@@ -65,16 +49,16 @@ mod tests {
 
     #[test]
     fn classify_stroke_and_tones() {
-        assert_eq!(classify_key('9'), VniKeyAction::Stroke);
-        assert_eq!(classify_key('1'), VniKeyAction::Tone(Tone::Sac));
-        assert_eq!(classify_key('5'), VniKeyAction::Tone(Tone::Nang));
-        assert_eq!(classify_key('m'), VniKeyAction::Normal);
+        assert_eq!(classify_key('9'), KeyAction::Stroke);
+        assert_eq!(classify_key('1'), KeyAction::Tone(Tone::Sac));
+        assert_eq!(classify_key('5'), KeyAction::Tone(Tone::Nang));
+        assert_eq!(classify_key('m'), KeyAction::Normal);
     }
 
     #[test]
     fn classify_shapes() {
-        assert_eq!(classify_key('6'), VniKeyAction::Shape(VowelShape::Circumflex));
-        assert_eq!(classify_key('7'), VniKeyAction::Shape(VowelShape::Horn));
-        assert_eq!(classify_key('8'), VniKeyAction::Shape(VowelShape::Breve));
+        assert_eq!(classify_key('6'), KeyAction::Shape(VowelShape::Circumflex));
+        assert_eq!(classify_key('7'), KeyAction::Shape(VowelShape::Horn));
+        assert_eq!(classify_key('8'), KeyAction::Shape(VowelShape::Breve));
     }
 }

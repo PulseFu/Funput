@@ -1,9 +1,7 @@
 //! Tone mark placement — modern Vietnamese reposition rules.
 
-use crate::unicode::marks::{
-    apply_shape, apply_tone_to_vowel, is_vowel, shape_on_vowel, tone_on_vowel, vowel_stem,
-    VowelShape,
-};
+use crate::unicode::marks::{apply_tone_to_vowel, is_vowel, tone_on_vowel, vowel_stem};
+use crate::unicode::shapes::{apply_shape, shape_on_vowel, VowelShape};
 
 struct VowelCluster {
     indices: Vec<usize>,
