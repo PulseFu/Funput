@@ -84,13 +84,39 @@ fi
 
 rm -rf "$ARCHIVE" "$EXPORT" "$OUT/dmg" "$DMG"
 
+# Run a build/export step quietly, but dump the captured xcodebuild log on failure
+# (xcodebuild writes errors to stdout, so swallowing it would hide the reason — as
+# happened in early CI runs).
+run_xcode() {
+    log="$OUT/xcodebuild.log"
+    if ! "$@" >"$log" 2>&1; then
+        echo "xcodebuild failed:" >&2
+        tail -n 40 "$log" >&2
+        exit 1
+    fi
+}
+
 # --- 3. Archive (universal: arm64 + x86_64) -------------------------------------
+# Sign at archive time with the Developer ID identity directly (Manual). The
+# project defaults to Automatic signing, which needs a logged-in Apple account and
+# a development cert — neither exists on a CI runner, so Automatic fails there. The
+# Developer ID cert in the keychain is all we need for direct distribution; no
+# provisioning profile is required (the app is not sandboxed). DRY_RUN skips signing
+# entirely and ad-hoc signs afterwards.
 echo "Archiving (universal)…"
-xcodebuild -project Funput.xcodeproj -scheme Funput -configuration "$CONFIGURATION" \
+# Build args via positional params so values with spaces ("Developer ID
+# Application", "arm64 x86_64") survive as single arguments.
+set -- -project Funput.xcodeproj -scheme Funput -configuration "$CONFIGURATION" \
     -derivedDataPath "$DERIVED" -archivePath "$ARCHIVE" \
-    -destination 'generic/platform=macOS' \
-    ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
-    archive >/dev/null
+    -destination "generic/platform=macOS" \
+    "ARCHS=arm64 x86_64" ONLY_ACTIVE_ARCH=NO
+if [ -n "$DRY_RUN" ]; then
+    set -- "$@" CODE_SIGNING_ALLOWED=NO
+else
+    set -- "$@" CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=$SIGN_ID" \
+        "DEVELOPMENT_TEAM=$TEAM_ID" "PROVISIONING_PROFILE_SPECIFIER="
+fi
+run_xcode xcodebuild "$@" archive
 
 # --- 4. Export the signed .app --------------------------------------------------
 if [ -n "$DRY_RUN" ]; then
@@ -102,8 +128,8 @@ if [ -n "$DRY_RUN" ]; then
     codesign --force --options runtime --timestamp=none --deep --sign "-" "$APP"
 else
     echo "Exporting with Developer ID…"
-    xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportPath "$EXPORT" \
-        -exportOptionsPlist "$PROJECT_DIR/ExportOptions.plist" >/dev/null
+    run_xcode xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportPath "$EXPORT" \
+        -exportOptionsPlist "$PROJECT_DIR/ExportOptions.plist"
 fi
 
 # --- 5. Verify the signature ----------------------------------------------------
