@@ -1,9 +1,9 @@
 import AppKit
+import Carbon
 import SwiftUI
 
-/// Guides the user to add Funput in System Settings → Keyboard → Input Sources.
-/// The "enabled" check is stubbed here; it is wired to `TISCreateInputSourceList`
-/// in the IME integration phase.
+/// Guides the user to add Funput in System Settings → Keyboard → Input Sources,
+/// reflecting live whether Funput is currently enabled as an input source.
 struct EnableInputSourceStep: View {
     @State private var isEnabled = false
 
@@ -29,6 +29,40 @@ struct EnableInputSourceStep: View {
             }
             .frame(maxWidth: 380)
             .padding(.top, Theme.Spacing.sm)
+        }
+        .onAppear(perform: refreshEnabled)
+        // System Settings changes the enabled/selected sources in another process;
+        // these distributed notifications let us update without polling.
+        .onReceive(tisNotification(kTISNotifyEnabledKeyboardInputSourcesChanged)) { _ in
+            refreshEnabled()
+        }
+        .onReceive(tisNotification(kTISNotifySelectedKeyboardInputSourceChanged)) { _ in
+            refreshEnabled()
+        }
+    }
+
+    private func tisNotification(_ name: CFString!) -> NotificationCenter.Publisher {
+        DistributedNotificationCenter.default().publisher(for: Notification.Name(name as String))
+    }
+
+    private func refreshEnabled() {
+        isEnabled = Self.funputIsEnabled()
+    }
+
+    /// True when a Funput input source is in the enabled list. Matches by bundle id
+    /// so it covers every input mode the bundle vends.
+    private static func funputIsEnabled() -> Bool {
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.pulsefu.inputmethod.Funput"
+        guard let list = TISCreateInputSourceList(nil, false)?.takeRetainedValue() as? [TISInputSource]
+        else {
+            return false
+        }
+        return list.contains { source in
+            guard let ptr = TISGetInputSourceProperty(source, kTISPropertyBundleID) else {
+                return false
+            }
+            let id = Unmanaged<CFString>.fromOpaque(ptr).takeUnretainedValue() as String
+            return id == bundleID
         }
     }
 
