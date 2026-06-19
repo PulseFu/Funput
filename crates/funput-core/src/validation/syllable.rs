@@ -97,11 +97,14 @@ pub fn validate_shape(buffer: &str) -> ModifierValidation {
     validate_modifier(buffer)
 }
 
-/// Validate stroke key (9) against the current buffer.
+/// Validate stroke key (9) against the current buffer. The stroke applies whenever
+/// there is a `d`/`D` to convert anywhere in the buffer (`dang` + `9` → `đang`),
+/// not only when it is the trailing char.
 pub fn validate_stroke(buffer: &str) -> ModifierValidation {
-    match buffer.chars().last() {
-        Some('d' | 'D') => ModifierValidation::Allow,
-        _ => ModifierValidation::Ignored,
+    if buffer.contains(['d', 'D']) {
+        ModifierValidation::Allow
+    } else {
+        ModifierValidation::Ignored
     }
 }
 
@@ -216,7 +219,11 @@ mod tests {
     #[test]
     fn validate_stroke_cases() {
         assert_eq!(validate_stroke("d"), ModifierValidation::Allow);
+        // A d anywhere in the buffer allows the stroke: dang9 → đang, GD9 → GĐ.
+        assert_eq!(validate_stroke("dang"), ModifierValidation::Allow);
+        assert_eq!(validate_stroke("GD"), ModifierValidation::Allow);
         assert_eq!(validate_stroke("x"), ModifierValidation::Ignored);
+        assert_eq!(validate_stroke("bag"), ModifierValidation::Ignored);
     }
 
     #[test]

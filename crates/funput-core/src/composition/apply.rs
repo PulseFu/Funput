@@ -16,18 +16,17 @@ fn ignored(buffer: &str) -> TransformResult {
     }
 }
 
-/// Turn the trailing `d`/`D` into `đ`/`Đ`.
+/// Turn a `d`/`D` into `đ`/`Đ` so the key works wherever it is typed: `dang` + `9`
+/// → `đang`, not only `d` + `9`. Targets the **last** `d` in the buffer — a
+/// Vietnamese syllable has at most one `d` (always the onset), and in an
+/// abbreviation run the last one is the most recent onset (`GD` + `9` → `GĐ`,
+/// `GDD` → `GĐ`).
 pub(crate) fn apply_stroke(buffer: &str) -> TransformResult {
     let mut chars: Vec<char> = buffer.chars().collect();
-    let Some(last) = chars.last().copied() else {
+    let Some(idx) = chars.iter().rposition(|c| matches!(c, 'd' | 'D')) else {
         return ignored(buffer);
     };
-    let Some(stroked) = stroke_d(last) else {
-        return ignored(buffer);
-    };
-
-    let len = chars.len();
-    chars[len - 1] = stroked;
+    chars[idx] = stroke_d(chars[idx]).expect("d/D always strokes");
     TransformResult {
         kind: TransformKind::Applied,
         text: chars.into_iter().collect(),

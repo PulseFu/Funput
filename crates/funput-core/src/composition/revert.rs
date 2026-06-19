@@ -15,17 +15,14 @@ pub(crate) fn replace_char_at(buffer: &str, char_idx: usize, new_ch: char) -> St
     chars.into_iter().collect()
 }
 
-/// Revert `đ`/`Đ` back to `d`/`D` when stroke key `9` is pressed again.
+/// Revert `đ`/`Đ` back to `d`/`D` when stroke key `9` is pressed again, matching
+/// the last `đ` that [`apply_stroke`] would have produced.
+///
+/// [`apply_stroke`]: crate::composition::apply::apply_stroke
 pub fn try_revert_stroke(buffer: &str) -> Option<String> {
     let mut chars: Vec<char> = buffer.chars().collect();
-    let last = *chars.last()?;
-    let reverted = match last {
-        'đ' => 'd',
-        'Đ' => 'D',
-        _ => return None,
-    };
-    let len = chars.len();
-    chars[len - 1] = reverted;
+    let idx = chars.iter().rposition(|c| matches!(c, 'đ' | 'Đ'))?;
+    chars[idx] = if chars[idx] == 'đ' { 'd' } else { 'D' };
     Some(chars.into_iter().collect())
 }
 
