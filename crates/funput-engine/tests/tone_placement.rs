@@ -15,3 +15,15 @@ fn traditional_tone_placement_and_ky_words() {
     assert_eq!(run(InputMethod::Vni, "ngoai2"), "ngoài");
     assert_eq!(run(InputMethod::Telex, "kyx"), "kỹ"); // kỹ
 }
+
+#[test]
+fn uu_diphthong_horns_first_vowel() {
+    // The `ưu` falling diphthong horns the first `u`, so the tone lands on `ư`
+    // regardless of whether the horn key comes before or after the second `u`.
+    assert_eq!(run(InputMethod::Telex, "cuuwf"), "cừu");
+    assert_eq!(run(InputMethod::Telex, "truuwf"), "trừu");
+    assert_eq!(run(InputMethod::Telex, "cuwuf"), "cừu"); // horn typed mid-cluster
+    assert_eq!(run(InputMethod::Vni, "cuu72"), "cừu");
+    assert_eq!(run(InputMethod::Vni, "tru7u2"), "trừu");
+    assert_eq!(run(InputMethod::Telex, "cuuws"), "cứu"); // sắc on ư too
+}

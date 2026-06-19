@@ -34,13 +34,22 @@ pub fn apply_shape_to_vowel(vowel: char, shape: VowelShape) -> Option<char> {
 /// Picks the appropriate target rather than the last vowel: e.g. `muoi` + `6`
 /// targets `o` (→ `muôi`), not the trailing `i` which cannot take a circumflex.
 pub fn shape_target_index(syllable: &str, shape: VowelShape) -> Option<usize> {
-    let mut target: Option<usize> = None;
+    let mut first: Option<usize> = None;
+    let mut last: Option<usize> = None;
     for (i, ch) in syllable.chars().enumerate() {
         if apply_shape_to_vowel(ch, shape).is_some() {
-            target = Some(i);
+            first.get_or_insert(i);
+            last = Some(i);
         }
     }
-    target
+    // Horn on a bare `uu` run forms the falling diphthong `ưu` (cừu, trừu, cứu) —
+    // the *first* `u` is horned. Other shapes (and single-candidate clusters)
+    // target the last receiving vowel, e.g. `muoi` + circumflex → `muôi`. The `uo`
+    // horn compound (→ `ươ`) is handled earlier by `apply_uo_compound`.
+    match shape {
+        VowelShape::Horn => first,
+        _ => last,
+    }
 }
 
 /// Index of the last vowel currently carrying `shape` (for reverting 6/7/8).
@@ -155,6 +164,16 @@ mod tests {
         assert_eq!(shape_target_index("to", VowelShape::Circumflex), Some(1));
         // No vowel can take the shape.
         assert_eq!(shape_target_index("ly", VowelShape::Circumflex), None);
+    }
+
+    #[test]
+    fn shape_target_index_horn_on_uu_targets_first_u() {
+        // Horn on a bare `uu` run makes `ưu` (cừu, trừu): the first `u` is horned,
+        // not the trailing one (which would give the invalid `uư`).
+        assert_eq!(shape_target_index("cuu", VowelShape::Horn), Some(1));
+        assert_eq!(shape_target_index("truu", VowelShape::Horn), Some(2));
+        // A single `u` is unambiguous.
+        assert_eq!(shape_target_index("cu", VowelShape::Horn), Some(1));
     }
 
     #[test]
