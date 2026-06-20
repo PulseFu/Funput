@@ -4,6 +4,7 @@
 
 use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_opener::OpenerExt;
 
 use crate::settings::{Hotkey, Method, Settings};
 use crate::shell;
@@ -48,4 +49,12 @@ pub fn set_launch_at_login(app: AppHandle, on: bool) {
 #[tauri::command]
 pub fn complete_onboarding() {
     shell::complete_onboarding();
+}
+
+/// Open an external link (GitHub / Website) in the system browser.
+#[tauri::command]
+pub fn open_url(app: AppHandle, url: String) -> Result<(), String> {
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| e.to_string())
 }

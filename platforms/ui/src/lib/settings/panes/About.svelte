@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import Pane from "../Pane.svelte";
   import GlassCard from "../../components/GlassCard.svelte";
-  import { getAppVersion } from "../../api";
+  import { getAppVersion, openUrl, LINKS } from "../../api";
 
   // Version comes from the app itself (Tauri reads it from tauri.conf.json, which CI
   // sets from the git tag) — single source of truth, no per-file drift.
@@ -27,6 +27,10 @@
       <h2>Funput</h2>
       <p>Bộ gõ tiếng Việt — miễn phí, mã nguồn mở.</p>
       <p class="ver">Phiên bản {version}</p>
+      <div class="links">
+        <button type="button" onclick={() => openUrl(LINKS.github)}>GitHub</button>
+        <button type="button" onclick={() => openUrl(LINKS.website)}>Website</button>
+      </div>
     </div>
   </GlassCard>
 </Pane>
@@ -63,5 +67,26 @@
   }
   .ver {
     margin-top: var(--space-sm);
+  }
+  .links {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: center;
+    margin-top: var(--space-md);
+  }
+  .links button {
+    appearance: none;
+    border: 1px solid var(--control-bg, rgba(120, 120, 128, 0.32));
+    background: var(--control-bg, rgba(120, 120, 128, 0.18));
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+  }
+  .links button:hover {
+    filter: brightness(1.15);
   }
 </style>

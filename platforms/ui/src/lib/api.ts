@@ -53,6 +53,22 @@ export const HOTKEYS: { id: Hotkey; caps: string[] }[] = [
   { id: "alt_shift", caps: ["Alt", "Shift"] },
 ];
 
+// Canonical Funput links, shared by every platform's About screen.
+export const LINKS = {
+  github: "https://github.com/pcodedynamics/Funput",
+  website: "https://funput.pulsefu.com/",
+};
+
+/// Open a URL in the system browser. In Tauri this goes through the `open_url`
+/// command (opener plugin); in a plain browser it falls back to `window.open`.
+export async function openUrl(url: string): Promise<void> {
+  if (!inTauri) {
+    window.open(url, "_blank", "noopener");
+    return;
+  }
+  await call("open_url", { url });
+}
+
 export async function closeThisWindow(): Promise<void> {
   if (!inTauri) return;
   const { getCurrentWindow } = await import("@tauri-apps/api/window");

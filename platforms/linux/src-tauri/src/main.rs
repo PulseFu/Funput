@@ -31,6 +31,7 @@ fn open(app: &AppHandle, label: &str, title: &str, w: f64, h: f64) {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::set_method,
@@ -40,6 +41,7 @@ fn main() {
             commands::set_toggle_hotkey,
             commands::set_launch_at_login,
             commands::complete_onboarding,
+            commands::open_url,
         ])
         .setup(|app| {
             let settings = Settings::load();

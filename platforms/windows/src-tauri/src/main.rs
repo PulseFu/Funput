@@ -21,6 +21,7 @@ fn main() {
             MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::set_method,
@@ -30,6 +31,7 @@ fn main() {
             commands::set_toggle_hotkey,
             commands::set_launch_at_login,
             commands::complete_onboarding,
+            commands::open_url,
         ])
         .setup(|app| {
             // Touch the shell to load persisted settings + apply them to the engine.

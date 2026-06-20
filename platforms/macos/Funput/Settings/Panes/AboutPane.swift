@@ -17,8 +17,8 @@ struct AboutPane: View {
                         .foregroundStyle(.secondary)
 
                     HStack(spacing: Theme.Spacing.md) {
-                        Link("GitHub", destination: URL(string: "https://github.com/")!)
-                        Link("Website", destination: URL(string: "https://github.com/")!)
+                        Link("GitHub", destination: URL(string: "https://github.com/pcodedynamics/Funput")!)
+                        Link("Website", destination: URL(string: "https://funput.pulsefu.com/")!)
                     }
                     .buttonStyle(.glass)
                     .padding(.top, Theme.Spacing.sm)

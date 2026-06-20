@@ -4,6 +4,9 @@
 //! command signatures (names + arg keys) must stay identical to the Windows ones so
 //! the same UI works unchanged.
 
+use tauri::AppHandle;
+use tauri_plugin_opener::OpenerExt;
+
 use crate::settings::{Hotkey, Method, Settings};
 
 #[tauri::command]
@@ -47,4 +50,12 @@ pub fn set_launch_at_login(on: bool) {
 #[tauri::command]
 pub fn complete_onboarding() {
     Settings::update(|s| s.has_completed_onboarding = true);
+}
+
+/// Open an external link (GitHub / Website) in the system browser.
+#[tauri::command]
+pub fn open_url(app: AppHandle, url: String) -> Result<(), String> {
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| e.to_string())
 }
