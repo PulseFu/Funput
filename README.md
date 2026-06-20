@@ -20,7 +20,7 @@
 | **Windows** | Sẵn sàng | Tải `funput.exe` → double-click → icon **FU** xuất hiện ở khay |
 | **Linux** | Đang build | Fcitx5 đang được lắp ráp — quay lại sớm nhé |
 
-**macOS:** Không có trên App Store (input method không sandbox được — không phải Funput lười). File `.pkg` đã ký Developer ID + notarized nên cài trực tiếp không bị chặn. Không thấy Funput trong danh sách? Log out/in một lần là xong.
+**macOS:** Không có trên App Store (input method không sandbox được — không phải Funput lười). File `.pkg` đã ký Developer ID + notarized nên cài trực tiếp không bị chặn. **Không có quyền admin?** Tải `.app.zip`, giải nén rồi kéo `Funput.app` vào `~/Library/Input Methods` (Finder → `Cmd+Shift+G` → gõ đường dẫn) — không cần admin. Không thấy Funput trong danh sách? Log out/in một lần là xong.
 
 **Windows:** SmartScreen có thể nhăn mặt lần đầu (chưa ký Authenticode). Mở app → Onboarding chào bạn → gõ luôn.
 

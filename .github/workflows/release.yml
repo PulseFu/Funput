@@ -89,10 +89,11 @@ jobs:
       - name: Stage artifact
         working-directory: platforms/macos
         run: |
-          PKG="$(ls build/release/Funput-*.pkg)"
           OUT="$RUNNER_TEMP/out"; mkdir -p "$OUT"
-          cp "$PKG" "$OUT/"
-          shasum -a 256 "$PKG" | awk '{print $1}' > "$OUT/$(basename "$PKG").sha256"
+          for f in build/release/Funput-*.pkg build/release/Funput-*.app.zip; do
+            cp "$f" "$OUT/"
+            shasum -a 256 "$f" | awk '{print $1}' > "$OUT/$(basename "$f").sha256"
+          done
 
       - uses: actions/upload-artifact@v4
         with:
@@ -175,8 +176,9 @@ jobs:
             echo "## Funput ${{ github.ref_name }}"
             echo
             echo "### macOS"
-            echo "- \`Funput-*.pkg\` — double-click để cài (mở Installer.app). Đã ký Developer ID Installer + notarized, không bị Gatekeeper chặn."
-            echo "  Sau khi cài: **System Settings → Keyboard → Input Sources → + → Vietnamese → Funput**."
+            echo "- \`Funput-*.pkg\` — **cách thường (có quyền admin):** double-click để cài (mở Installer.app), nhập mật khẩu. Đã ký Developer ID Installer + notarized, không bị Gatekeeper chặn."
+            echo "- \`Funput-*.app.zip\` — **không có quyền admin:** giải nén, rồi kéo \`Funput.app\` vào \`~/Library/Input Methods\` (Finder → \`Cmd+Shift+G\` → gõ đường dẫn đó, tạo nếu chưa có). App đã notarized nên không bị chặn; không cần admin."
+            echo "  Sau khi cài (cả hai cách): **System Settings → Keyboard → Input Sources → + → Vietnamese → Funput**. Chưa thấy thì log out/in một lần."
             echo "### Windows"
             echo "- \`Funput-*.exe\` — portable, double-click là chạy (nằm ở khay hệ thống). Cần WebView2 (có sẵn trên Win10/11)."
             echo
@@ -190,6 +192,7 @@ jobs:
         with:
           files: |
             out/*.pkg
+            out/*.app.zip
             out/*.exe
           body_path: notes.md
           generate_release_notes: true

@@ -61,6 +61,7 @@ if [ -z "${VERSION:-}" ]; then
 fi
 VERSION="${VERSION:-0.0.0}"
 PKG="$OUT/Funput-$VERSION.pkg"
+APPZIP="$OUT/Funput-$VERSION.app.zip"
 echo "Releasing Funput $VERSION (${DRY_RUN:+DRY_RUN }$CONFIGURATION)…"
 
 # --- 2. Preflight ---------------------------------------------------------------
@@ -98,7 +99,7 @@ EOF
     fi
 fi
 
-rm -rf "$ARCHIVE" "$EXPORT" "$OUT/pkgroot" "$OUT/Funput-component.pkg" "$PKG"
+rm -rf "$ARCHIVE" "$EXPORT" "$OUT/pkgroot" "$OUT/Funput-component.pkg" "$PKG" "$APPZIP"
 
 # Run a build/export step quietly, but dump the captured xcodebuild log on failure
 # (xcodebuild writes errors to stdout, so swallowing it would hide the reason — as
@@ -172,16 +173,17 @@ fi
 # A double-clickable .pkg replaces the old "Install Funput.command": unlike a flat
 # shell script (which cannot carry a notarization ticket and so always trips
 # Gatekeeper), a .pkg is signed with "Developer ID Installer", notarized, and
-# stapled — Installer.app opens it with no warning. The payload lands in a staging
-# path under /Library; the bundled postinstall then relocates it into the logged-in
-# user's ~/Library/Input Methods (see scripts/pkg/postinstall).
+# stapled — Installer.app opens it with no warning. The payload installs Funput.app
+# directly into /Library/Input Methods (a valid, system-wide input-method search
+# location), so the install is correct from the payload alone; the postinstall only
+# does best-effort LaunchServices registration (see scripts/pkg/postinstall).
 echo "Building .pkg…"
 PKGROOT="$OUT/pkgroot"
 SCRIPTS="$OUT/pkgscripts"
 COMPONENT="$OUT/Funput-component.pkg"
 rm -rf "$PKGROOT" "$SCRIPTS"
-mkdir -p "$PKGROOT/Library/Application Support/Funput" "$SCRIPTS"
-cp -R "$APP" "$PKGROOT/Library/Application Support/Funput/Funput.app"
+mkdir -p "$PKGROOT/Library/Input Methods" "$SCRIPTS"
+cp -R "$APP" "$PKGROOT/Library/Input Methods/Funput.app"
 cp "$PROJECT_DIR/scripts/pkg/postinstall" "$SCRIPTS/postinstall"
 chmod +x "$SCRIPTS/postinstall"
 
@@ -205,10 +207,21 @@ if [ -z "$DRY_RUN" ]; then
     xcrun stapler staple "$PKG"
 fi
 
+# --- 8b. Zip the stapled app (no-admin / per-user install) ----------------------
+# Secondary artifact for users who cannot authenticate as admin: the .pkg installs
+# system-wide (/Library/Input Methods) and so needs an admin password, but the app
+# is notarized + stapled (step 6), so a non-admin can just unzip this and drop
+# Funput.app into their own ~/Library/Input Methods — no privileges, no Gatekeeper
+# warning. keepParent so the archive expands to "Funput.app", not loose contents.
+echo "Zipping app (no-admin install)…"
+ditto -c -k --keepParent "$APP" "$APPZIP"
+
 # --- 9. Report ------------------------------------------------------------------
 echo ""
 echo "Built: $PKG"
 shasum -a 256 "$PKG"
+echo "Built: $APPZIP"
+shasum -a 256 "$APPZIP"
 if [ -n "$DRY_RUN" ]; then
     echo "(DRY_RUN: ad-hoc signed app, UNSIGNED pkg, NOT notarized — pipeline test only.)"
 fi
