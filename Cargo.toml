@@ -6,6 +6,13 @@ members = [
     "crates/funput-cli",
     "crates/funput-ffi",
     "crates/funput-term",
+    "crates/funput-desktop",
+]
+# The Windows shell pulls in `tauri` + the `windows` crate, which only build on a
+# Windows target. Keep it out of the default workspace so `cargo test --workspace`
+# stays green on macOS/Linux dev machines; build it from its own dir on Windows.
+exclude = [
+    "platforms/windows/src-tauri",
 ]
 
 [workspace.package]

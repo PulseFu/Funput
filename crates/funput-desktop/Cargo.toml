@@ -1,0 +1,8 @@
+[package]
+name = "funput-desktop"
+version.workspace = true
+edition.workspace = true
+description = "Platform-agnostic logic for hook-based desktop input shells (Windows now)."
+
+[dependencies]
+funput-engine = { path = "../funput-engine" }
