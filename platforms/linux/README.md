@@ -51,10 +51,22 @@ platforms/linux/build.sh
 # → pnpm -C platforms/ui build (Svelte → dist)
 # → cargo build (Tauri Settings)
 # → cmake + cpack             (addon + .deb)
-# Kết quả: platforms/linux/build/funput_*_amd64.deb
+# Kết quả: platforms/linux/build/funput_<version>_<arch>.deb (arch = host: amd64/arm64)
 ```
 
-Cài thử: `sudo apt install ./platforms/linux/build/funput_*_amd64.deb`.
+Cài thử: `sudo apt install ./platforms/linux/build/funput_*.deb`.
+
+> Cài đúng kiến trúc: gói build trên máy nào ra kiến trúc máy đó (`amd64`/`arm64`).
+> Apple Silicon (Apple Virtualization) là `arm64`; gói `amd64` sẽ báo mọi dependency
+> "not installable" do lệch kiến trúc.
+>
+> Nếu `apt`/`dpkg` báo lỗi đọc file (`could not locate member control.tar`,
+> `unexpected end of file…`) → file `.deb` tải về bị **hỏng/cắt cụt**, không phải lỗi
+> gói. Tải lại trực tiếp trên máy đích và đối chiếu `sha256sum` với file `.sha256`.
+
+> Gói được `dpkg-deb` đóng lại sau CPack — nếu không, `ar` container của CPack bị
+> apt từ chối (`could not locate member control.tar`) dù `dpkg`/`binutils` đọc được.
+> Gặp lỗi đó với gói cũ: cài tạm bằng `sudo dpkg -i …` rồi `sudo apt-get install -f`.
 
 ## Cài & bật
 

@@ -157,9 +157,19 @@ jobs:
           path: ${{ runner.temp }}/out/*
 
   # ---- Linux: shared UI + Fcitx5 addon + Settings app → .deb ----------------
+  # Built natively per arch (no cross-compile) so dpkg-shlibdeps records the right
+  # deps. arm64 covers Apple Silicon VMs (Apple Virtualization) and arm servers.
   linux:
     needs: version
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
@@ -211,15 +221,14 @@ jobs:
           cmake --build platforms/linux/build --parallel
           ( cd platforms/linux/build && cpack -G DEB )
 
-      - name: Verify .deb is well-formed
+      - name: Verify .deb (apt can parse it)
         run: |
-          # Fail fast if CPack produced an archive dpkg/apt can't read, instead of
-          # shipping a broken package.
+          # Fail fast instead of shipping a broken package. `--simulate` forces apt
+          # to parse the .deb metadata through its own reader.
           for f in platforms/linux/build/*.deb; do
             echo "== $f =="
-            ar t "$f"
             dpkg-deb --info "$f" >/dev/null
-            dpkg-deb --contents "$f" >/dev/null
+            sudo apt-get install --simulate "./$f" >/dev/null
           done
 
       - name: Stage artifact
@@ -232,7 +241,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: linux
+          name: linux-${{ matrix.arch }}
           path: ${{ runner.temp }}/out/*
 
   # ---- Publish one release with all artifacts -------------------------------
@@ -250,7 +259,7 @@ jobs:
           mkdir -p out
           cp artifacts/macos/* out/ 2>/dev/null || true
           cp artifacts/windows/* out/ 2>/dev/null || true
-          cp artifacts/linux/* out/ 2>/dev/null || true
+          cp artifacts/linux-*/* out/ 2>/dev/null || true
           ls -l out
           {
             echo "## Funput ${{ github.ref_name }}"
@@ -262,7 +271,7 @@ jobs:
             echo "### Windows"
             echo "- \`Funput-*.exe\` — portable, double-click là chạy (nằm ở khay hệ thống). Cần WebView2 (có sẵn trên Win10/11)."
             echo "### Linux"
-            echo "- \`funput_*_amd64.deb\` — \`sudo apt install ./funput_*_amd64.deb\` (Debian/Ubuntu, cần Fcitx5). Sau đó: \`fcitx5-configtool\` → thêm **Funput** vào danh sách input method. Mở **Funput** trong menu ứng dụng để chỉnh Telex/VNI."
+            echo "- \`funput_*_amd64.deb\` (PC x86-64) / \`funput_*_arm64.deb\` (Apple Silicon VM, máy ARM) — chọn đúng kiến trúc (\`dpkg --print-architecture\`), rồi \`sudo apt install ./funput_*_<arch>.deb\` (Ubuntu/Debian, cần Fcitx5). Sau đó: \`fcitx5-configtool\` → thêm **Funput** vào danh sách input method. Mở **Funput** trong menu ứng dụng để chỉnh Telex/VNI."
             echo
             echo "### SHA-256"
             for f in out/*.sha256; do

@@ -18,7 +18,7 @@
 |----------|-----------|--------|
 | **macOS** | Sẵn sàng | Tải `.pkg` → double-click để cài → **System Settings → Keyboard → Input Sources → + → Vietnamese → Funput** |
 | **Windows** | Sẵn sàng | Tải `funput.exe` → double-click → icon **FU** xuất hiện ở khay |
-| **Linux** | Sẵn sàng | Tải `funput_*_amd64.deb` → `sudo apt install ./funput_*_amd64.deb` → bật **Funput** trong `fcitx5-configtool` |
+| **Linux** | Sẵn sàng | Tải `.deb` đúng kiến trúc (`amd64` cho PC, `arm64` cho Apple Silicon/ARM) → `sudo apt install ./funput_*.deb` → bật **Funput** trong `fcitx5-configtool` |
 
 **macOS:** Không có trên App Store (input method không sandbox được — không phải Funput lười). File `.pkg` đã ký Developer ID + notarized nên cài trực tiếp không bị chặn. **Không có quyền admin?** Tải `.app.zip`, giải nén rồi kéo `Funput.app` vào `~/Library/Input Methods` (Finder → `Cmd+Shift+G` → gõ đường dẫn) — không cần admin. Không thấy Funput trong danh sách? Log out/in một lần là xong.
 

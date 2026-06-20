@@ -104,8 +104,17 @@ set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/pcodedynamics/Funput")
 # fcitx5 must be present; the rest are picked up automatically.
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "fcitx5")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-set(CPACK_PACKAGE_FILE_NAME "funput_${FUNPUT_VERSION}_amd64")
-# Use GNU tar inside the .deb. CPack's default ("paxr") produces archives that
-# modern dpkg/apt reject with "could not locate member control.tar".
-set(CPACK_DEBIAN_ARCHIVE_TYPE "gnutar")
+# Architecture from the build host (amd64 / arm64 / …). CPack sets the control
+# field from this; mirror it in the filename so an arm64 build isn't mislabelled
+# "amd64". Apple Silicon VMs (Apple Virtualization) are arm64, so a host-arch deb
+# matters there.
+find_program(DPKG_CMD dpkg)
+if(DPKG_CMD)
+    execute_process(COMMAND ${DPKG_CMD} --print-architecture
+        OUTPUT_VARIABLE FUNPUT_DEB_ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
+else()
+    set(FUNPUT_DEB_ARCH "amd64")
+endif()
+set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${FUNPUT_DEB_ARCH}")
+set(CPACK_PACKAGE_FILE_NAME "funput_${FUNPUT_VERSION}_${FUNPUT_DEB_ARCH}")
 include(CPack)
