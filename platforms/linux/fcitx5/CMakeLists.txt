@@ -7,6 +7,15 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Install into /usr, not the /usr/local default. Fcitx5 only scans the system
+# addon dirs (/usr/lib/<triplet>/fcitx5, /usr/share/fcitx5) — it ignores
+# /usr/local. The /usr prefix also makes GNUInstallDirs use the Debian multiarch
+# libdir, so FCITX_INSTALL_ADDONDIR resolves correctly. Must run before
+# find_package(Fcitx5Utils), which computes those install dirs.
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "Install prefix" FORCE)
+endif()
+
 find_package(Fcitx5Core REQUIRED)
 find_package(Fcitx5Utils REQUIRED)
 find_package(nlohmann_json 3 REQUIRED)
@@ -94,6 +103,9 @@ endif()
 # CI overrides this from the git tag (-DFUNPUT_VERSION=...); otherwise project().
 set(FUNPUT_VERSION "${PROJECT_VERSION}" CACHE STRING "Package version")
 set(CPACK_GENERATOR "DEB")
+# Lay the relative installs (bin, share/…) under /usr to match the absolute
+# Fcitx5 addon dirs — everything in the .deb lives under /usr.
+set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
 set(CPACK_PACKAGE_NAME "funput")
 set(CPACK_PACKAGE_VERSION "${FUNPUT_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Vietnamese input method (Telex & VNI) — Fcitx5 addon")
