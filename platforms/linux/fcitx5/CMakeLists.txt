@@ -105,4 +105,7 @@ set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/pcodedynamics/Funput")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "fcitx5")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_PACKAGE_FILE_NAME "funput_${FUNPUT_VERSION}_amd64")
+# Use GNU tar inside the .deb. CPack's default ("paxr") produces archives that
+# modern dpkg/apt reject with "could not locate member control.tar".
+set(CPACK_DEBIAN_ARCHIVE_TYPE "gnutar")
 include(CPack)

@@ -211,6 +211,17 @@ jobs:
           cmake --build platforms/linux/build --parallel
           ( cd platforms/linux/build && cpack -G DEB )
 
+      - name: Verify .deb is well-formed
+        run: |
+          # Fail fast if CPack produced an archive dpkg/apt can't read, instead of
+          # shipping a broken package.
+          for f in platforms/linux/build/*.deb; do
+            echo "== $f =="
+            ar t "$f"
+            dpkg-deb --info "$f" >/dev/null
+            dpkg-deb --contents "$f" >/dev/null
+          done
+
       - name: Stage artifact
         run: |
           OUT="$RUNNER_TEMP/out"; mkdir -p "$OUT"
