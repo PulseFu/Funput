@@ -19,7 +19,7 @@ fn open(app: &AppHandle, label: &str, title: &str, w: f64, h: f64) {
         return;
     }
 
-    let url = WebviewUrl::App(format!("index.html?view={label}").into());
+    let url = WebviewUrl::App(format!("index.html?view={label}&platform=windows").into());
     let built = WebviewWindowBuilder::new(app, label, url)
         .title(title)
         .inner_size(w, h)

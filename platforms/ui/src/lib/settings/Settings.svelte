@@ -11,13 +11,15 @@
   let settings = $state<api.Settings | null>(null);
   let active = $state("input");
 
+  // "Chung" only holds launch-at-login, which is a no-op on Linux (fcitx5/desktop
+  // own autostart there) — so hide that tab on Linux.
   const items = [
     { id: "input", label: "Kiểu gõ", icon: "⌨" },
     { id: "keyboard", label: "Phím chuyển", icon: "⌥" },
     { id: "smart", label: "Thông minh", icon: "✨" },
     { id: "general", label: "Chung", icon: "⚙" },
     { id: "about", label: "Giới thiệu", icon: "ⓘ" },
-  ];
+  ].filter((it) => !(api.isLinux && it.id === "general"));
 
   onMount(async () => {
     settings = await api.getSettings();

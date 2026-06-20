@@ -64,10 +64,6 @@ Cài thử: `sudo apt install ./platforms/linux/build/funput_*.deb`.
 > `unexpected end of file…`) → file `.deb` tải về bị **hỏng/cắt cụt**, không phải lỗi
 > gói. Tải lại trực tiếp trên máy đích và đối chiếu `sha256sum` với file `.sha256`.
 
-> Gói được `dpkg-deb` đóng lại sau CPack — nếu không, `ar` container của CPack bị
-> apt từ chối (`could not locate member control.tar`) dù `dpkg`/`binutils` đọc được.
-> Gặp lỗi đó với gói cũ: cài tạm bằng `sudo dpkg -i …` rồi `sudo apt-get install -f`.
-
 ## Cài & bật
 
 1. `fcitx5-configtool` → **+** → thêm **Funput** (nhóm Vietnamese).

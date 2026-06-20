@@ -19,12 +19,15 @@ fn open(app: &AppHandle, label: &str, title: &str, w: f64, h: f64) {
         let _ = win.set_focus();
         return;
     }
-    let url = WebviewUrl::App(format!("index.html?view={label}").into());
+    // Opaque window: Linux has no Acrylic/Mica material, so the UI paints its own
+    // solid background (see tokens.css `[data-platform="linux"]`). `platform=linux`
+    // tells the shared UI which styling + copy to use.
+    let url = WebviewUrl::App(format!("index.html?view={label}&platform=linux").into());
     let _ = WebviewWindowBuilder::new(app, label, url)
         .title(title)
         .inner_size(w, h)
         .resizable(false)
-        .transparent(true)
+        .transparent(false)
         .center()
         .build();
 }

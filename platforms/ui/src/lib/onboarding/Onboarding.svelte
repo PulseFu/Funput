@@ -42,7 +42,10 @@
         {#if step === 0}
           <div class="hero">👋</div>
           <h1>Chào mừng đến Funput</h1>
-          <p>Gõ tiếng Việt ở mọi nơi trên Windows — miễn phí, mã nguồn mở.</p>
+          <p>
+            Gõ tiếng Việt ở mọi nơi trên {api.isLinux ? "Linux" : "Windows"} —
+            miễn phí, mã nguồn mở.
+          </p>
         {:else if step === 1}
           <div class="hero">⌨️</div>
           <h1>Chọn kiểu gõ</h1>
@@ -62,15 +65,21 @@
             Funput chạy nền ở khay hệ thống (icon “FU”). Nhấn
             <KeyCap label="Ctrl" /> <KeyCap label="`" /> để bật/tắt nhanh tiếng Việt.
           </p>
-          <p class="note">Lưu ý: không gõ được vào ứng dụng chạy quyền Administrator.</p>
+          {#if !api.isLinux}
+            <p class="note">Lưu ý: không gõ được vào ứng dụng chạy quyền Administrator.</p>
+          {/if}
         {:else}
           <div class="hero">✅</div>
           <h1>Sẵn sàng!</h1>
-          <p>Bật tự khởi động để Funput luôn có mặt khi bạn cần.</p>
-          <label class="launch">
-            <span>Khởi động cùng Windows</span>
-            <Toggle checked={settings.launchAtLogin} onchange={setLaunch} />
-          </label>
+          {#if api.isLinux}
+            <p>Bật Funput trong <strong>fcitx5-configtool</strong> rồi gõ thử ngay.</p>
+          {:else}
+            <p>Bật tự khởi động để Funput luôn có mặt khi bạn cần.</p>
+            <label class="launch">
+              <span>Khởi động cùng Windows</span>
+              <Toggle checked={settings.launchAtLogin} onchange={setLaunch} />
+            </label>
+          {/if}
         {/if}
       </div>
 

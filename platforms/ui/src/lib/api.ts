@@ -28,6 +28,15 @@ const DEFAULTS: Settings = {
   hasCompletedOnboarding: false,
 };
 
+// Which OS shell hosts this UI. The shell appends `&platform=windows|linux` to the
+// window URL (alongside `?view=`); empty in a plain browser (`pnpm dev`). Drives
+// platform-specific styling and copy so one UI looks right on both shells.
+export const PLATFORM =
+  typeof window !== "undefined"
+    ? (new URLSearchParams(location.search).get("platform") ?? "")
+    : "";
+export const isLinux = PLATFORM === "linux";
+
 const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | undefined> {

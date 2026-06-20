@@ -42,6 +42,29 @@
   }
 }
 
+/* Linux has no Acrylic/Mica material to reveal, so a transparent window just shows
+   the desktop through the card gaps. Give Linux an opaque window background and
+   slightly more opaque cards/sidebar so everything reads clearly. The translucent
+   cards over this solid background still keep a soft frosted look. */
+:root[data-platform="linux"] {
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --sidebar-bg: rgba(255, 255, 255, 0.46);
+}
+:root[data-platform="linux"] body {
+  background: radial-gradient(120% 120% at 50% 0%, #eef0f6 0%, #e3e5ee 55%, #d9dbe6 100%);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-platform="linux"] {
+    --glass-bg: rgba(54, 54, 60, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --sidebar-bg: rgba(38, 38, 44, 0.5);
+  }
+  :root[data-platform="linux"] body {
+    background: radial-gradient(120% 120% at 50% 0%, #2b2c33 0%, #232429 55%, #1b1c21 100%);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
