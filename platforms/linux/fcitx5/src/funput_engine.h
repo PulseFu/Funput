@@ -34,10 +34,17 @@ private:
     bool handleBoundary(fcitx::InputContext *ic, char32_t scalar);
     bool matchesToggle(const fcitx::Key &key) const;
     void toggleEnabled(fcitx::InputContext *ic);
+    // Per-app auto-switch (mirrors the macOS shell): excluded apps default to
+    // English on focus, every other app to Vietnamese. No-op when the list is empty.
+    void applyPerAppDefault(const std::string &program);
+    void noteRecentApp(const std::string &program); // record for the Settings picker
 
     fcitx::Instance *instance_;
     funput::Handle handle_;
     funput::Settings settings_;
+    // Runtime VI/EN actually in effect. Starts from settings_.enabled but is driven
+    // per-app on focus; the toggle overrides it until the next focus change.
+    bool effectiveEnabled_ = true;
 };
 
 class FunputEngineFactory : public fcitx::AddonFactory {

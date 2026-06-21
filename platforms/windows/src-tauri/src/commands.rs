@@ -6,12 +6,32 @@ use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 
-use crate::settings::{Hotkey, Method, Settings};
+use crate::settings::{ExcludedApp, Hotkey, Method, Settings};
 use crate::shell;
 
 #[tauri::command]
 pub fn get_settings() -> Settings {
     shell::snapshot()
+}
+
+#[tauri::command]
+pub fn get_excluded_apps() -> Vec<ExcludedApp> {
+    shell::excluded_apps()
+}
+
+#[tauri::command]
+pub fn add_excluded_app(app: ExcludedApp) {
+    shell::add_excluded_app(app);
+}
+
+#[tauri::command]
+pub fn remove_excluded_app(id: String) {
+    shell::remove_excluded_app(&id);
+}
+
+#[tauri::command]
+pub fn list_recent_apps() -> Vec<ExcludedApp> {
+    shell::recent_apps()
 }
 
 #[tauri::command]

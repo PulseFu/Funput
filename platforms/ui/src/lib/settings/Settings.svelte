@@ -6,6 +6,7 @@
   import Keyboard from "./panes/Keyboard.svelte";
   import Smart from "./panes/Smart.svelte";
   import General from "./panes/General.svelte";
+  import Apps from "./panes/Apps.svelte";
   import About from "./panes/About.svelte";
 
   let settings = $state<api.Settings | null>(null);
@@ -17,6 +18,7 @@
     { id: "input", label: "Kiểu gõ", icon: "⌨" },
     { id: "keyboard", label: "Phím chuyển", icon: "⌥" },
     { id: "smart", label: "Thông minh", icon: "✨" },
+    { id: "apps", label: "Ứng dụng", icon: "🚫" },
     { id: "general", label: "Chung", icon: "⚙" },
     { id: "about", label: "Giới thiệu", icon: "ⓘ" },
   ].filter((it) => !(api.isLinux && it.id === "general"));
@@ -36,6 +38,8 @@
         <Keyboard {settings} />
       {:else if active === "smart"}
         <Smart {settings} />
+      {:else if active === "apps"}
+        <Apps {settings} />
       {:else if active === "general"}
         <General {settings} />
       {:else}

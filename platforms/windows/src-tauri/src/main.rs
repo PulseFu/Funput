@@ -32,6 +32,10 @@ fn main() {
             commands::set_launch_at_login,
             commands::complete_onboarding,
             commands::open_url,
+            commands::get_excluded_apps,
+            commands::add_excluded_app,
+            commands::remove_excluded_app,
+            commands::list_recent_apps,
         ])
         .setup(|app| {
             // Touch the shell to load persisted settings + apply them to the engine.

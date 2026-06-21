@@ -24,7 +24,16 @@ pub enum Hotkey {
     AltShift,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+/// An app excluded from Vietnamese input. `id` is the fcitx5 program()/WM_CLASS
+/// (e.g. "code"); `name` is a friendly label for the Settings UI.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExcludedApp {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub method: Method,
@@ -34,6 +43,10 @@ pub struct Settings {
     pub toggle_hotkey: Hotkey,
     pub launch_at_login: bool,
     pub has_completed_onboarding: bool,
+    /// Apps that default to English on focus. `#[serde(default)]` keeps older
+    /// settings files (without this key) loadable instead of resetting to defaults.
+    #[serde(default)]
+    pub excluded_apps: Vec<ExcludedApp>,
 }
 
 impl Default for Settings {
@@ -46,6 +59,7 @@ impl Default for Settings {
             toggle_hotkey: Hotkey::CtrlBacktick,
             launch_at_login: false,
             has_completed_onboarding: false,
+            excluded_apps: Vec::new(),
         }
     }
 }
@@ -53,6 +67,16 @@ impl Default for Settings {
 fn settings_path() -> Option<PathBuf> {
     // ~/.config/Funput/settings.json (XDG-aware via `dirs`).
     dirs::config_dir().map(|d| d.join("Funput").join("settings.json"))
+}
+
+/// Read the recently-focused apps the Fcitx5 addon recorded in
+/// `~/.config/Funput/recent-apps.json`. Empty on missing/corrupt file.
+pub fn recent_apps() -> Vec<ExcludedApp> {
+    dirs::config_dir()
+        .map(|d| d.join("Funput").join("recent-apps.json"))
+        .and_then(|p| fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
 }
 
 impl Settings {

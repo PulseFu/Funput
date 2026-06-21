@@ -73,9 +73,27 @@ bool Settings::reloadIfChanged() {
     eagerRestore = j.value("eagerRestore", eagerRestore);
     toggleHotkey = parseHotkey(j.value("toggleHotkey", std::string(hotkeyStr(toggleHotkey))));
 
+    // excludedApps: [{ "id": "code", "name": "Code" }, ...] — keep just the ids.
+    excludedAppIds.clear();
+    if (auto it = j.find("excludedApps"); it != j.end() && it->is_array()) {
+        for (const auto &app : *it) {
+            if (app.is_object() && app.contains("id") && app["id"].is_string()) {
+                excludedAppIds.push_back(app["id"].get<std::string>());
+            }
+        }
+    }
+
     return method != prev.method || enabled != prev.enabled ||
            smartRestore != prev.smartRestore || eagerRestore != prev.eagerRestore ||
-           toggleHotkey != prev.toggleHotkey;
+           toggleHotkey != prev.toggleHotkey || excludedAppIds != prev.excludedAppIds;
+}
+
+bool Settings::isExcluded(const std::string &program) const {
+    if (program.empty()) return false;
+    for (const auto &id : excludedAppIds) {
+        if (id == program) return true;
+    }
+    return false;
 }
 
 void Settings::save() const {
