@@ -26,7 +26,7 @@ xcodebuild -project Funput.xcodeproj -scheme Funput -configuration "$CONFIGURATI
     -derivedDataPath "$DERIVED" \
     -destination 'platform=macOS' build >/dev/null
 
-echo "Installing to $DEST…"
+echo "Installing to $DEST"
 mkdir -p "$DEST"
 # Quit a running instance so the bundle can be replaced and reloaded.
 killall Funput 2>/dev/null || true

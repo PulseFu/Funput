@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace funput {
 
@@ -20,6 +21,12 @@ struct Settings {
     bool smartRestore = true;
     bool eagerRestore = true;
     Hotkey toggleHotkey = Hotkey::CtrlBacktick;
+    // App identifiers (fcitx5 program() / WM_CLASS) that default to English on
+    // focus. Owned by the Settings UI; the addon only reads them for matching.
+    std::vector<std::string> excludedAppIds;
+
+    // Whether `program` (fcitx5 InputContext::program()) is on the exclusion list.
+    bool isExcluded(const std::string &program) const;
 
     // Absolute path to ~/.config/Funput/settings.json (XDG-aware).
     static std::string path();

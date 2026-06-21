@@ -1,3 +1,4 @@
+import AppKit
 import InputMethodKit
 
 /// Bridges macOS key events to `funput-engine` via marked (underlined) text.
@@ -48,7 +49,8 @@ final class FunputInputController: IMKInputController {
             return true
         }
 
-        // English mode: pass everything straight through to the app.
+        // English mode: pass everything straight through to the app. The VI/EN state
+        // is set per-app on focus change (see `activateServer`) and can be toggled.
         guard AppSettings.shared.vietnameseEnabled else { return false }
 
         // Keyboard shortcuts (⌘C, ⌃A, …) are not text: end composition and let
@@ -92,9 +94,31 @@ final class FunputInputController: IMKInputController {
         if let client = sender as? IMKTextInput { commit(into: client) }
     }
 
+    /// Focus moved into this client. Apply the per-app default: apps on the exclusion
+    /// list switch to English, every other app switches to Vietnamese. This updates
+    /// `vietnameseEnabled` (so the menu bar reflects it immediately) and the user can
+    /// still toggle manually afterwards until focus changes again.
+    override func activateServer(_ sender: Any!) {
+        super.activateServer(sender)
+        applyPerAppDefault()
+        syncSettings()
+    }
+
     override func deactivateServer(_ sender: Any!) {
         if let client = sender as? IMKTextInput { commit(into: client) }
         super.deactivateServer(sender)
+    }
+
+    /// Set VI/EN from the frontmost app's exclusion status. No-op when the list is
+    /// empty so users who don't use the feature keep a plain global toggle.
+    private func applyPerAppDefault() {
+        let settings = AppSettings.shared
+        guard !settings.excludedApps.isEmpty else { return }
+        let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        let vietnamese = !settings.isExcluded(front)
+        guard settings.vietnameseEnabled != vietnamese else { return }
+        settings.vietnameseEnabled = vietnamese
+        composer.setEnabled(vietnamese)
     }
 
     // MARK: - Commit

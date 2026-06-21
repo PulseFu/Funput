@@ -10,7 +10,7 @@ struct StatusMenu: View {
         @Bindable var settings = settings
 
         Toggle(isOn: $settings.vietnameseEnabled) {
-            Text(settings.vietnameseEnabled ? "Tiếng Việt (đang bật)" : "Tiếng Anh (đang tắt)")
+            Text(settings.vietnameseEnabled ? "Tiếng Việt (đang bật)" : "Tiếng Việt (đang tắt)")
         }
         .keyboardShortcut("\\", modifiers: .control)
 

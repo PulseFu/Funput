@@ -8,15 +8,21 @@ use std::sync::{Mutex, OnceLock};
 use funput_core::InputMethod;
 use funput_engine::{Engine, ImeResult};
 
-use crate::settings::{Hotkey, Method, Settings};
+use crate::settings::{ExcludedApp, Hotkey, Method, Settings};
 
 /// Tag stamped into `dwExtraInfo` of every event we synthesize via `SendInput`, so
 /// the hook can recognize and ignore its own injected keystrokes (no re-entrancy).
 pub const INJECT_TAG: usize = 0x4655_4E50; // "FUNP"
 
+/// How many recently-focused apps to keep for the Settings "recent apps" picker.
+const RECENT_CAP: usize = 12;
+
 struct Shell {
     engine: Engine,
     settings: Settings,
+    /// Recently-focused apps (most recent first), fed by the foreground hook. Not
+    /// persisted — it's just a convenience source for the Settings UI.
+    recent: Vec<ExcludedApp>,
 }
 
 static SHELL: OnceLock<Mutex<Shell>> = OnceLock::new();
@@ -34,7 +40,11 @@ fn shell() -> &'static Mutex<Shell> {
         let settings = Settings::load();
         let mut engine = Engine::new();
         apply_to_engine(&mut engine, &settings);
-        Mutex::new(Shell { engine, settings })
+        Mutex::new(Shell {
+            engine,
+            settings,
+            recent: Vec::new(),
+        })
     })
 }
 
@@ -46,7 +56,13 @@ fn with<R>(f: impl FnOnce(&mut Shell) -> R) -> R {
 // --- reads -----------------------------------------------------------------
 
 pub fn snapshot() -> Settings {
-    with(|s| s.settings)
+    with(|s| s.settings.clone())
+}
+pub fn excluded_apps() -> Vec<ExcludedApp> {
+    with(|s| s.settings.excluded_apps.clone())
+}
+pub fn recent_apps() -> Vec<ExcludedApp> {
+    with(|s| s.recent.clone())
 }
 pub fn enabled() -> bool {
     with(|s| s.settings.enabled)
@@ -134,6 +150,63 @@ pub fn complete_onboarding() {
         s.settings.has_completed_onboarding = true;
         s.settings.save();
     });
+}
+
+pub fn add_excluded_app(app: ExcludedApp) {
+    with(|s| {
+        if !s.settings.excluded_apps.iter().any(|a| a.id == app.id) {
+            s.settings.excluded_apps.push(app);
+            s.settings.save();
+        }
+    });
+}
+
+pub fn remove_excluded_app(id: &str) {
+    with(|s| {
+        let before = s.settings.excluded_apps.len();
+        s.settings.excluded_apps.retain(|a| a.id != id);
+        if s.settings.excluded_apps.len() != before {
+            s.settings.save();
+        }
+    });
+}
+
+// --- per-app auto-switch (called from the foreground hook) ------------------
+
+/// Record the just-focused app for the Settings "recent apps" picker (deduped,
+/// most-recent-first, capped). No-op for empty ids.
+pub fn note_foreground(id: String, name: String) {
+    if id.is_empty() {
+        return;
+    }
+    with(|s| {
+        s.recent.retain(|a| a.id != id);
+        s.recent.insert(0, ExcludedApp { id, name });
+        s.recent.truncate(RECENT_CAP);
+    });
+}
+
+/// Apply the per-app default for the newly-focused app, mirroring the macOS shell:
+/// excluded apps → English, every other app → Vietnamese. No-op (returns `None`)
+/// when the list is empty or the state is unchanged. Returns `Some(on)` when it
+/// flipped VI/EN, so the caller can refresh the tray.
+pub fn apply_for_app(id: &str) -> Option<bool> {
+    with(|s| {
+        if s.settings.excluded_apps.is_empty() {
+            return None;
+        }
+        let on = !s.settings.excluded_apps.iter().any(|a| a.id == id);
+        if s.settings.enabled == on {
+            return None;
+        }
+        s.settings.enabled = on;
+        s.engine.set_enabled(on);
+        if !on {
+            s.engine.clear();
+        }
+        s.settings.save();
+        Some(on)
+    })
 }
 
 // --- composition driving (called from the hook) ----------------------------

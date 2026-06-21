@@ -6,12 +6,18 @@
 use std::sync::OnceLock;
 
 use funput_desktop::{classify, plan_inject, KeyKind};
-use windows::Win32::Foundation::{HINSTANCE, LPARAM, LRESULT, WPARAM};
+use windows::core::PWSTR;
+use windows::Win32::Foundation::{CloseHandle, HINSTANCE, HMODULE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::System::Threading::{
+    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+};
+use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage, HC_ACTION,
-    KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_SYSKEYDOWN,
+    CallNextHookEx, DispatchMessageW, GetMessageW, GetWindowThreadProcessId, SetWindowsHookExW,
+    TranslateMessage, EVENT_SYSTEM_FOREGROUND, HC_ACTION, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL,
+    WINEVENT_OUTOFCONTEXT, WM_KEYDOWN, WM_SYSKEYDOWN,
 };
 
 use crate::{inject, keymap, shell};
@@ -33,13 +39,79 @@ pub fn spawn() {
             eprintln!("Funput: failed to install keyboard hook: {hook:?}");
             return;
         }
-        // LL keyboard hooks are delivered through this thread's message queue.
+        // Also watch foreground changes for per-app VI/EN auto-switch. An OUT_OF_CONTEXT
+        // WinEvent hook is delivered to this thread's message queue (same pump below),
+        // so its callback shares the engine via `shell` with no extra synchronization.
+        let _win_event = SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            HMODULE::default(),
+            Some(win_event_proc),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT,
+        );
+
+        // LL keyboard + WinEvent hooks are delivered through this thread's message queue.
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
             let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
     });
+}
+
+/// Foreground-window changed: record the app and apply its per-app VI/EN default.
+unsafe extern "system" fn win_event_proc(
+    _hook: HWINEVENTHOOK,
+    event: u32,
+    hwnd: HWND,
+    _id_object: i32,
+    _id_child: i32,
+    _thread: u32,
+    _time: u32,
+) {
+    if event != EVENT_SYSTEM_FOREGROUND {
+        return;
+    }
+    let Some((id, name)) = exe_of_window(hwnd) else {
+        return;
+    };
+    shell::note_foreground(id.clone(), name);
+    if let Some(on) = shell::apply_for_app(&id) {
+        if let Some(cb) = ON_TOGGLE.get() {
+            cb(on); // keep tray checkmark / tooltip in sync with the auto-switch
+        }
+    }
+}
+
+/// Resolve a window's owning process to `(id, name)` where `id` is the lowercased
+/// exe file name (e.g. "code.exe") and `name` strips the extension (e.g. "code").
+unsafe fn exe_of_window(hwnd: HWND) -> Option<(String, String)> {
+    if hwnd.0.is_null() {
+        return None;
+    }
+    let mut pid = 0u32;
+    GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    if pid == 0 {
+        return None;
+    }
+    let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false.into(), pid).ok()?;
+
+    let mut buf = [0u16; 260];
+    let mut len = buf.len() as u32;
+    let res = QueryFullProcessImageNameW(handle, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len);
+    let _ = CloseHandle(handle);
+    res.ok()?;
+
+    let full = String::from_utf16_lossy(&buf[..len as usize]);
+    let file = full.rsplit(['\\', '/']).next().unwrap_or("").to_string();
+    if file.is_empty() {
+        return None;
+    }
+    let id = file.to_lowercase();
+    let name = id.strip_suffix(".exe").unwrap_or(&id).to_string();
+    Some((id, name))
 }
 
 unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

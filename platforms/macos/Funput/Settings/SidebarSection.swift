@@ -5,6 +5,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case inputMethod
     case smart
     case keyboard
+    case apps
     case about
 
     var id: String { rawValue }
@@ -15,6 +16,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case .inputMethod: "Phương thức gõ"
         case .smart: "Thông minh"
         case .keyboard: "Bàn phím"
+        case .apps: "Ứng dụng"
         case .about: "Giới thiệu"
         }
     }
@@ -25,6 +27,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case .inputMethod: "keyboard"
         case .smart: "sparkles"
         case .keyboard: "command"
+        case .apps: "app.badge"
         case .about: "info.circle"
         }
     }

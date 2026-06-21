@@ -8,6 +8,13 @@ import { invoke } from "@tauri-apps/api/core";
 export type Method = "telex" | "vni";
 export type Hotkey = "ctrl_backtick" | "ctrl_space" | "alt_shift";
 
+/// An app excluded from Vietnamese input. `id` is the platform-specific identifier
+/// (Windows: exe name like "code.exe"; Linux: fcitx5 program/WM_CLASS like "code").
+export interface ExcludedApp {
+  id: string;
+  name: string;
+}
+
 export interface Settings {
   method: Method;
   enabled: boolean;
@@ -16,6 +23,7 @@ export interface Settings {
   toggleHotkey: Hotkey;
   launchAtLogin: boolean;
   hasCompletedOnboarding: boolean;
+  excludedApps: ExcludedApp[];
 }
 
 const DEFAULTS: Settings = {
@@ -26,6 +34,7 @@ const DEFAULTS: Settings = {
   toggleHotkey: "ctrl_backtick",
   launchAtLogin: false,
   hasCompletedOnboarding: false,
+  excludedApps: [],
 };
 
 // Which OS shell hosts this UI. The shell appends `&platform=windows|linux` to the
@@ -55,6 +64,18 @@ export const setEagerRestore = (on: boolean) => call("set_eager_restore", { on }
 export const setToggleHotkey = (hotkey: Hotkey) => call("set_toggle_hotkey", { hotkey });
 export const setLaunchAtLogin = (on: boolean) => call("set_launch_at_login", { on });
 export const completeOnboarding = () => call("complete_onboarding");
+
+// --- Per-app exclusion ------------------------------------------------------
+// Command names are identical across the Windows and Linux shells so this UI
+// works unchanged on both. `id` is the platform's app identifier.
+
+export const getExcludedApps = async (): Promise<ExcludedApp[]> =>
+  (await call<ExcludedApp[]>("get_excluded_apps")) ?? [];
+export const addExcludedApp = (app: ExcludedApp) => call("add_excluded_app", { app });
+export const removeExcludedApp = (id: string) => call("remove_excluded_app", { id });
+/// Apps the engine has seen focused recently — the source for one-tap adding.
+export const listRecentApps = async (): Promise<ExcludedApp[]> =>
+  (await call<ExcludedApp[]>("list_recent_apps")) ?? [];
 
 export const HOTKEYS: { id: Hotkey; caps: string[] }[] = [
   { id: "ctrl_backtick", caps: ["Ctrl", "`"] },

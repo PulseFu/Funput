@@ -38,7 +38,16 @@ pub enum Hotkey {
     AltShift,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+/// An app excluded from Vietnamese input. `id` is the lowercased exe file name
+/// (e.g. "code.exe"); `name` is a friendly label for the Settings UI.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExcludedApp {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub method: Method,
@@ -48,6 +57,10 @@ pub struct Settings {
     pub toggle_hotkey: Hotkey,
     pub launch_at_login: bool,
     pub has_completed_onboarding: bool,
+    /// Apps that default to English on focus. `#[serde(default)]` keeps older
+    /// settings files (without this key) loadable instead of resetting to defaults.
+    #[serde(default)]
+    pub excluded_apps: Vec<ExcludedApp>,
 }
 
 impl Default for Settings {
@@ -60,6 +73,7 @@ impl Default for Settings {
             toggle_hotkey: Hotkey::CtrlBacktick,
             launch_at_login: false,
             has_completed_onboarding: false,
+            excluded_apps: Vec::new(),
         }
     }
 }

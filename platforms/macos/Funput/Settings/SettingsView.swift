@@ -30,6 +30,7 @@ struct SettingsView: View {
         case .inputMethod: InputMethodPane()
         case .smart: SmartPane()
         case .keyboard: KeyboardPane()
+        case .apps: AppExclusionPane()
         case .about: AboutPane()
         }
     }

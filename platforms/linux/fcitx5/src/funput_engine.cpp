@@ -1,11 +1,29 @@
 #include "funput_engine.h"
 
+#include <fstream>
+#include <sstream>
+
 #include <fcitx/inputpanel.h>
 #include <fcitx/text.h>
 #include <fcitx/userinterface.h>
 #include <fcitx-utils/keysym.h>
+#include <nlohmann/json.hpp>
 
 namespace {
+
+using json = nlohmann::json;
+
+// ~/.config/Funput/recent-apps.json — derived from the settings.json path so it
+// lands in the same XDG config dir.
+std::string recentAppsPath() {
+    std::string p = funput::Settings::path();
+    const std::string from = "settings.json";
+    if (auto pos = p.rfind(from); pos != std::string::npos) {
+        p.replace(pos, from.size(), "recent-apps.json");
+        return p;
+    }
+    return {};
+}
 
 // Word boundary — ASCII whitespace or punctuation, digits excluded (VNI uses
 // them as tone modifiers). Mirrors funput_core's rule and the macOS shell.
@@ -26,10 +44,47 @@ FunputEngine::FunputEngine(fcitx::Instance *instance) : instance_(instance) {
 
 void FunputEngine::applySettings() {
     handle_.setMethod(static_cast<uint8_t>(settings_.method));
-    handle_.setEnabled(settings_.enabled);
+    effectiveEnabled_ = settings_.enabled; // baseline; activate() refines it per-app
+    handle_.setEnabled(effectiveEnabled_);
     handle_.setSmartRestore(settings_.smartRestore);
     handle_.setEagerRestore(settings_.eagerRestore);
     handle_.clear();
+}
+
+// excluded app → English; any other app → Vietnamese. No-op when the list is empty
+// (keeps the plain global toggle for users who don't use the feature).
+void FunputEngine::applyPerAppDefault(const std::string &program) {
+    const bool eff = settings_.excludedAppIds.empty()
+                         ? settings_.enabled
+                         : !settings_.isExcluded(program);
+    if (eff == effectiveEnabled_) return;
+    effectiveEnabled_ = eff;
+    handle_.setEnabled(eff);
+    handle_.clear();
+}
+
+// Append a newly-seen app to ~/.config/Funput/recent-apps.json (capped, deduped).
+// Only writes when the program is new, so it doesn't churn on every focus change.
+void FunputEngine::noteRecentApp(const std::string &program) {
+    if (program.empty()) return;
+    const std::string p = recentAppsPath();
+    if (p.empty()) return;
+
+    json arr = json::array();
+    if (std::ifstream in(p); in) {
+        std::stringstream ss;
+        ss << in.rdbuf();
+        json parsed = json::parse(ss.str(), nullptr, false);
+        if (parsed.is_array()) arr = std::move(parsed);
+    }
+    for (const auto &e : arr) {
+        if (e.is_object() && e.value("id", std::string()) == program) return; // already known
+    }
+    arr.insert(arr.begin(), json{{"id", program}, {"name", program}});
+    if (arr.size() > 12) arr.erase(arr.begin() + 12, arr.end());
+
+    std::ofstream out(p, std::ios::trunc);
+    if (out) out << arr.dump(2);
 }
 
 void FunputEngine::updatePreedit(fcitx::InputContext *ic) {
@@ -100,8 +155,9 @@ bool FunputEngine::matchesToggle(const fcitx::Key &key) const {
 
 void FunputEngine::toggleEnabled(fcitx::InputContext *ic) {
     commitBuffer(ic); // commit any in-progress word first
-    settings_.enabled = !settings_.enabled;
-    handle_.setEnabled(settings_.enabled);
+    effectiveEnabled_ = !effectiveEnabled_;
+    settings_.enabled = effectiveEnabled_; // persist baseline; holds until next focus
+    handle_.setEnabled(effectiveEnabled_);
     settings_.save(); // persist so the Settings UI reflects the new state
 }
 
@@ -117,7 +173,7 @@ void FunputEngine::keyEvent(const fcitx::InputMethodEntry &, fcitx::KeyEvent &ke
         return;
     }
 
-    if (!settings_.enabled) return; // English mode: pass everything through
+    if (!effectiveEnabled_) return; // English mode: pass everything through
 
     // Keyboard shortcuts (Ctrl/Alt/Super combos) are not text: end composition and
     // let the app handle them.
@@ -163,9 +219,13 @@ void FunputEngine::reset(const fcitx::InputMethodEntry &, fcitx::InputContextEve
     clearPreedit(event.inputContext());
 }
 
-void FunputEngine::activate(const fcitx::InputMethodEntry &, fcitx::InputContextEvent &) {
+void FunputEngine::activate(const fcitx::InputMethodEntry &, fcitx::InputContextEvent &event) {
     // Pick up settings changed by the Tauri Settings app (cheap mtime check).
     if (settings_.reloadIfChanged()) applySettings();
+    // Per-app auto-switch on focus-in, mirroring the macOS shell's activateServer.
+    const std::string program = event.inputContext()->program();
+    applyPerAppDefault(program);
+    noteRecentApp(program);
 }
 
 void FunputEngine::deactivate(const fcitx::InputMethodEntry &, fcitx::InputContextEvent &event) {
