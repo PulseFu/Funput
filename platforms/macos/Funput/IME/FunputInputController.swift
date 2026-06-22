@@ -189,6 +189,7 @@ final class FunputInputController: IMKInputController {
     private func syncSettings() {
         let settings = AppSettings.shared
         composer.setMethod(settings.inputMethod)
+        composer.setToneStyle(settings.toneStyle)
         composer.setEnabled(settings.vietnameseEnabled)
         composer.setSmartRestore(settings.smartEnglishRestore)
         composer.setEagerRestore(settings.eagerRestore)

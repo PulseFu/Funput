@@ -19,6 +19,11 @@ final class AppSettings {
     var inputMethod: InputMethod {
         didSet { defaults.set(inputMethod.rawValue, forKey: Keys.inputMethod) }
     }
+    /// Tone-mark placement style (traditional `hòa` vs modern `hoà`). Read live by
+    /// `FunputInputController` and pushed to the engine.
+    var toneStyle: ToneStyle {
+        didSet { defaults.set(toneStyle.rawValue, forKey: Keys.toneStyle) }
+    }
     /// Whether Vietnamese composition is active (vs. English pass-through). Flipped by
     /// the toggle shortcut and the menu bar; read live by `FunputInputController`.
     var vietnameseEnabled: Bool {
@@ -61,6 +66,7 @@ final class AppSettings {
             Keys.vietnameseEnabled: true,
         ])
         inputMethod = InputMethod(rawValue: defaults.integer(forKey: Keys.inputMethod)) ?? .telex
+        toneStyle = ToneStyle(rawValue: defaults.integer(forKey: Keys.toneStyle)) ?? .traditional
         vietnameseEnabled = defaults.bool(forKey: Keys.vietnameseEnabled)
         smartEnglishRestore = defaults.bool(forKey: Keys.smartEnglishRestore)
         eagerRestore = defaults.bool(forKey: Keys.eagerRestore)
@@ -94,6 +100,7 @@ final class AppSettings {
 
     private enum Keys {
         static let inputMethod = "inputMethod"
+        static let toneStyle = "toneStyle"
         static let vietnameseEnabled = "vietnameseEnabled"
         static let smartEnglishRestore = "smartEnglishRestore"
         static let eagerRestore = "eagerRestore"

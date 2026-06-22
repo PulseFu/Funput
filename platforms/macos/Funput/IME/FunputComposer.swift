@@ -20,6 +20,11 @@ final class FunputComposer {
         funput_set_method(handle, UInt8(method.rawValue))
     }
 
+    /// Tone-mark placement style (traditional `hòa` vs modern `hoà`).
+    func setToneStyle(_ style: ToneStyle) {
+        funput_set_tone_style(handle, UInt8(style.rawValue))
+    }
+
     func setEnabled(_ enabled: Bool) {
         funput_set_enabled(handle, enabled)
     }
