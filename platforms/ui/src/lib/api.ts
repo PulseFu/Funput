@@ -85,7 +85,7 @@ export const HOTKEYS: { id: Hotkey; caps: string[] }[] = [
 
 // Canonical Funput links, shared by every platform's About screen.
 export const LINKS = {
-  github: "https://github.com/pcodedynamics/Funput",
+  github: "https://github.com/PulseFu/Funput",
   website: "https://funput.pulsefu.com/",
 };
 
