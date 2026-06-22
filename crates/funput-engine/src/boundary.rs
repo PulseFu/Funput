@@ -63,7 +63,7 @@ pub(crate) fn on_word_boundary(session: &mut Session, boundary_key: char) -> Ime
 mod tests {
     use super::*;
     use crate::result::Action;
-    use funput_core::InputMethod;
+    use funput_core::{InputMethod, ToneStyle};
 
     #[test]
     fn word_boundary_chars() {
@@ -84,6 +84,7 @@ mod tests {
             method: InputMethod::Telex,
             buffer: "ábc".into(),
             keys: "absc".into(),
+            tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
         };
@@ -97,6 +98,7 @@ mod tests {
             method: InputMethod::Telex,
             buffer: "má".into(),
             keys: "mas".into(),
+            tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
         };
@@ -110,6 +112,7 @@ mod tests {
             method: InputMethod::Telex,
             buffer: "text".into(),
             keys: "text".into(),
+            tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
         };
@@ -130,6 +133,7 @@ mod tests {
             method: InputMethod::Vni,
             buffer: "đc".into(),
             keys: "d9c".into(),
+            tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
         };
@@ -144,6 +148,7 @@ mod tests {
             method: InputMethod::Telex,
             buffer: "GĐ".into(),
             keys: "GDD".into(),
+            tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
         };
@@ -157,6 +162,7 @@ mod tests {
             method: InputMethod::Telex,
             buffer: "ábc".into(),
             keys: "absc".into(),
+            tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
         };
@@ -175,6 +181,7 @@ mod tests {
             method: InputMethod::Telex,
             buffer: "má".into(),
             keys: "mas".into(),
+            tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
         };

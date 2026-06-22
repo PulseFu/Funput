@@ -18,12 +18,13 @@
 
 mod types;
 
-use funput_core::InputMethod;
+use funput_core::{InputMethod, ToneStyle};
 use funput_engine::Engine;
 
 pub use types::{FunputResult, ACTION_NONE, ACTION_RESTORE, ACTION_SEND, CHARS_CAP};
 
 const METHOD_VNI: u8 = 1;
+const TONE_STYLE_MODERN: u8 = 1;
 
 /// Opaque IME engine handle for C callers. Create with [`funput_engine_new`],
 /// release with [`funput_engine_free`]. cbindgen emits this as an opaque struct.
@@ -63,6 +64,23 @@ pub unsafe extern "C" fn funput_set_method(engine: *mut FunputEngine, method: u8
             InputMethod::Telex
         };
         engine.inner.set_method(method);
+    }
+}
+
+/// Set the tone-mark placement style: `0 = Traditional` (`hòa`), `1 = Modern`
+/// (`hoà`) — any other value = Traditional.
+///
+/// # Safety
+/// `engine` must be a valid handle or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn funput_set_tone_style(engine: *mut FunputEngine, style: u8) {
+    if let Some(engine) = unsafe { engine.as_mut() } {
+        let style = if style == TONE_STYLE_MODERN {
+            ToneStyle::Modern
+        } else {
+            ToneStyle::Traditional
+        };
+        engine.inner.set_tone_style(style);
     }
 }
 

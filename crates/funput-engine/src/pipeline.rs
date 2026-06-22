@@ -10,7 +10,7 @@ use crate::session::Session;
 ///
 /// `session.keys` already includes `key` (pushed by the caller).
 pub(crate) fn process(session: &mut Session, key: char) -> ImeResult {
-    let result = apply(&session.buffer, key, session.method);
+    let result = apply(&session.buffer, key, session.method, session.tone_style);
 
     // Buffer after composing this key (the engine appends literally on Ignored).
     let composed = match result.kind {

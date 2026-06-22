@@ -1,6 +1,6 @@
 mod support;
 
-use funput_core::{apply, InputMethod, TransformKind, TransformResult};
+use funput_core::{apply, InputMethod, ToneStyle, TransformKind, TransformResult};
 
 fn type_keys(keys: &str) -> String {
     support::type_keys(InputMethod::Telex, keys)
@@ -72,14 +72,14 @@ fn telex_complex_syllables() {
 fn telex_validation_and_pass_through() {
     // A tone letter with no vowel to land on is kept literally, not dropped.
     assert_eq!(
-        apply("ng", 's', InputMethod::Telex),
+        apply("ng", 's', InputMethod::Telex, ToneStyle::Traditional),
         TransformResult {
             kind: TransformKind::Pending,
             text: "ngs".into(),
         }
     );
     assert_eq!(
-        apply("text", 's', InputMethod::Telex),
+        apply("text", 's', InputMethod::Telex, ToneStyle::Traditional),
         TransformResult {
             kind: TransformKind::Pending,
             text: "texts".into(),
@@ -90,7 +90,7 @@ fn telex_validation_and_pass_through() {
     assert_eq!(type_keys("from"), "from");
     assert_eq!(type_keys("just"), "just");
     assert_eq!(
-        apply("a", 'b', InputMethod::Telex),
+        apply("a", 'b', InputMethod::Telex, ToneStyle::Traditional),
         TransformResult {
             kind: TransformKind::Pending,
             text: "ab".into(),

@@ -13,7 +13,7 @@ use crate::unicode::tone_position::reposition_existing_tone;
 use crate::validation::syllable::{
     validate_shape, validate_stroke, validate_tone, ModifierValidation,
 };
-use crate::{TransformKind, TransformResult};
+use crate::{ToneStyle, TransformKind, TransformResult};
 
 fn reverted(text: String) -> TransformResult {
     TransformResult {
@@ -37,13 +37,13 @@ fn validation_gate(buffer: &str, key: char, validation: ModifierValidation) -> O
 }
 
 /// Apply one VNI keystroke to `buffer`.
-pub(crate) fn apply_vni(buffer: &str, key: char) -> TransformResult {
-    apply_action(buffer, key, vni::classify_key(buffer, key))
+pub(crate) fn apply_vni(buffer: &str, key: char, style: ToneStyle) -> TransformResult {
+    apply_action(buffer, key, vni::classify_key(buffer, key), style)
 }
 
 /// Apply one Telex keystroke to `buffer`.
-pub(crate) fn apply_telex(buffer: &str, key: char) -> TransformResult {
-    apply_action(buffer, key, telex::classify_key(buffer, key))
+pub(crate) fn apply_telex(buffer: &str, key: char, style: ToneStyle) -> TransformResult {
+    apply_action(buffer, key, telex::classify_key(buffer, key), style)
 }
 
 /// Apply a classified key action to `buffer`.
@@ -52,7 +52,12 @@ pub(crate) fn apply_telex(buffer: &str, key: char) -> TransformResult {
 /// [`KeyAction`] — the revert → validate → apply orchestration here is shared.
 /// `key` is the literal character to append for [`KeyAction::Normal`] and
 /// pass-through.
-pub(crate) fn apply_action(buffer: &str, key: char, action: KeyAction) -> TransformResult {
+pub(crate) fn apply_action(
+    buffer: &str,
+    key: char,
+    action: KeyAction,
+    style: ToneStyle,
+) -> TransformResult {
     match action {
         KeyAction::Stroke => {
             if let Some(text) = try_revert_stroke(buffer) {
@@ -62,11 +67,11 @@ pub(crate) fn apply_action(buffer: &str, key: char, action: KeyAction) -> Transf
                 .unwrap_or_else(|| apply_stroke(buffer))
         }
         KeyAction::Tone(tone) => {
-            if let Some(text) = try_revert_tone(buffer, tone) {
+            if let Some(text) = try_revert_tone(buffer, tone, style) {
                 return reverted(format!("{text}{key}"));
             }
             validation_gate(buffer, key, validate_tone(buffer))
-                .unwrap_or_else(|| apply_tone_key(buffer, tone))
+                .unwrap_or_else(|| apply_tone_key(buffer, tone, style))
         }
         KeyAction::Shape(shape) => {
             // Apply takes priority when an unshaped target exists, so the second
@@ -97,7 +102,7 @@ pub(crate) fn apply_action(buffer: &str, key: char, action: KeyAction) -> Transf
         },
         KeyAction::Normal => {
             let text = format!("{buffer}{key}");
-            match reposition_existing_tone(&text) {
+            match reposition_existing_tone(&text, style) {
                 Some(repositioned) => TransformResult {
                     kind: TransformKind::Applied,
                     text: repositioned,
@@ -116,29 +121,48 @@ mod tests {
     use super::*;
     use crate::{apply, InputMethod};
 
+    /// VNI keystroke with the default (traditional) tone style.
+    fn av(buffer: &str, key: char) -> TransformResult {
+        apply_vni(buffer, key, ToneStyle::Traditional)
+    }
+
+    /// Telex keystroke with the default (traditional) tone style.
+    fn at(buffer: &str, key: char) -> TransformResult {
+        apply_telex(buffer, key, ToneStyle::Traditional)
+    }
+
     fn type_keys(keys: &str) -> String {
         let mut buf = String::new();
         for key in keys.chars() {
-            buf = apply_vni(&buf, key).text;
+            buf = av(&buf, key).text;
+        }
+        buf
+    }
+
+    /// Type a VNI sequence with the modern ("kiểu mới") tone style.
+    fn type_keys_modern(keys: &str) -> String {
+        let mut buf = String::new();
+        for key in keys.chars() {
+            buf = apply_vni(&buf, key, ToneStyle::Modern).text;
         }
         buf
     }
 
     #[test]
     fn stroke_and_tone_basics() {
-        assert_eq!(apply_vni("d", '9').text, "đ");
-        assert_eq!(apply_vni("D", '9').text, "Đ");
+        assert_eq!(av("d", '9').text, "đ");
+        assert_eq!(av("D", '9').text, "Đ");
         for (key, expected) in [('1', "á"), ('2', "à"), ('3', "ả"), ('4', "ã"), ('5', "ạ")] {
-            assert_eq!(apply_vni("a", key).text, expected, "key {key}");
+            assert_eq!(av("a", key).text, expected, "key {key}");
         }
     }
 
     #[test]
     fn shape_basics_and_compound() {
-        assert_eq!(apply_vni("a", '6').text, "â");
-        assert_eq!(apply_vni("o", '7').text, "ơ");
-        assert_eq!(apply_vni("a", '8').text, "ă");
-        assert_eq!(apply_vni("uo", '7').text, "ươ");
+        assert_eq!(av("a", '6').text, "â");
+        assert_eq!(av("o", '7').text, "ơ");
+        assert_eq!(av("a", '8').text, "ă");
+        assert_eq!(av("uo", '7').text, "ươ");
     }
 
     #[test]
@@ -162,7 +186,7 @@ mod tests {
         let telex = |keys: &str| {
             let mut buf = String::new();
             for key in keys.chars() {
-                buf = apply_telex(&buf, key).text;
+                buf = at(&buf, key).text;
             }
             buf
         };
@@ -184,12 +208,27 @@ mod tests {
     }
 
     #[test]
+    fn modern_tone_style_oa_oe_uy() {
+        // "Kiểu mới": tone on the second vowel for open oa/oe/uy, regardless of
+        // where the tone key is typed.
+        assert_eq!(type_keys_modern("hoa2"), "hoà"); // tone after both vowels
+        assert_eq!(type_keys_modern("ho2a"), "hoà"); // tone typed before `a` (reposition)
+        assert_eq!(type_keys_modern("thuy3"), "thuỷ");
+        assert_eq!(type_keys_modern("khoe3"), "khoẻ");
+        // Unchanged from traditional: ia/ua, coda, triphthong, shaped vowel.
+        assert_eq!(type_keys_modern("mua1"), "múa");
+        assert_eq!(type_keys_modern("hoan2"), "hoàn");
+        assert_eq!(type_keys_modern("ngoai2"), "ngoài");
+        assert_eq!(type_keys_modern("tru7o7n2g"), "trường");
+    }
+
+    #[test]
     fn revert_cases() {
         // Double modifier restores raw keystrokes: strip diacritic + append the key.
-        assert_eq!(apply_vni("á", '1'), reverted("a1".into()));
-        assert_eq!(apply_vni("â", '6'), reverted("a6".into()));
-        assert_eq!(apply_vni("đ", '9'), reverted("d9".into()));
-        assert_eq!(apply_vni("ấ", '1'), reverted("â1".into()));
+        assert_eq!(av("á", '1'), reverted("a1".into()));
+        assert_eq!(av("â", '6'), reverted("a6".into()));
+        assert_eq!(av("đ", '9'), reverted("d9".into()));
+        assert_eq!(av("ấ", '1'), reverted("â1".into()));
         assert_eq!(type_keys("a12"), "à"); // different tone key → re-tone, not revert
         assert_eq!(type_keys("a11"), "a1");
         assert_eq!(type_keys("a66"), "a6");
@@ -199,10 +238,10 @@ mod tests {
 
     #[test]
     fn ignored_and_pending() {
-        assert_eq!(apply_vni("", '6').kind, TransformKind::Ignored);
-        assert_eq!(apply_vni("ng", '7').kind, TransformKind::Ignored);
-        assert_eq!(apply_vni("", '1').kind, TransformKind::Ignored);
-        assert_eq!(apply_vni("a", 'b'), TransformResult {
+        assert_eq!(av("", '6').kind, TransformKind::Ignored);
+        assert_eq!(av("ng", '7').kind, TransformKind::Ignored);
+        assert_eq!(av("", '1').kind, TransformKind::Ignored);
+        assert_eq!(av("a", 'b'), TransformResult {
             kind: TransformKind::Pending,
             text: "ab".into(),
         });
@@ -212,7 +251,7 @@ mod tests {
     fn dispatches_through_public_api() {
         let mut buf = String::new();
         for key in "ma1".chars() {
-            buf = apply(&buf, key, InputMethod::Vni).text;
+            buf = apply(&buf, key, InputMethod::Vni, ToneStyle::Traditional).text;
         }
         assert_eq!(buf, "má");
     }

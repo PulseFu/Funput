@@ -7,7 +7,7 @@ use crate::composition::replace_char_at;
 use crate::unicode::marks::{apply_tone_to_vowel, is_vowel, stroke_d, tone_on_vowel, vowel_stem, Tone};
 use crate::unicode::shapes::{apply_shape, apply_shape_to_vowel, shape_target_index, VowelShape};
 use crate::unicode::tone_position::{tone_target_vowel, tone_vowel_index};
-use crate::{TransformKind, TransformResult};
+use crate::{ToneStyle, TransformKind, TransformResult};
 
 fn ignored(buffer: &str) -> TransformResult {
     TransformResult {
@@ -34,8 +34,8 @@ pub(crate) fn apply_stroke(buffer: &str) -> TransformResult {
 }
 
 /// Place `tone` on the nucleus vowel (handles reposition and `ie`/`gie` → `ê`).
-pub(crate) fn apply_tone_key(buffer: &str, tone: Tone) -> TransformResult {
-    let Some(vowel_idx) = tone_vowel_index(buffer) else {
+pub(crate) fn apply_tone_key(buffer: &str, tone: Tone, style: ToneStyle) -> TransformResult {
+    let Some(vowel_idx) = tone_vowel_index(buffer, style) else {
         return ignored(buffer);
     };
 

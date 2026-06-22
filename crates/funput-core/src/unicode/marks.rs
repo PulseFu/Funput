@@ -61,10 +61,10 @@ pub fn is_vowel(c: char) -> bool {
     vowels::is_vowel(c)
 }
 
-/// Index of the vowel where a tone mark should be placed (modern Vietnamese rules).
+/// Index of the vowel where a tone mark should be placed, for the given `style`.
 #[allow(dead_code)] // Public API — used by engine and external callers.
-pub fn main_vowel_index(syllable: &str) -> Option<usize> {
-    crate::unicode::tone_position::tone_vowel_index(syllable)
+pub fn main_vowel_index(syllable: &str, style: crate::ToneStyle) -> Option<usize> {
+    crate::unicode::tone_position::tone_vowel_index(syllable, style)
 }
 
 /// Detect tone on a vowel character, if any.
@@ -116,9 +116,11 @@ mod tests {
 
     #[test]
     fn main_vowel_index_delegates_to_tone_rules() {
-        assert_eq!(main_vowel_index("hoa"), Some(1)); // hòa — tone on `o`
-        assert_eq!(main_vowel_index("chao"), Some(2));
-        assert_eq!(main_vowel_index("ma"), Some(1));
-        assert_eq!(main_vowel_index("ng"), None);
+        use crate::ToneStyle::{Modern, Traditional};
+        assert_eq!(main_vowel_index("hoa", Traditional), Some(1)); // hòa — tone on `o`
+        assert_eq!(main_vowel_index("hoa", Modern), Some(2)); // hoà — tone on `a`
+        assert_eq!(main_vowel_index("chao", Traditional), Some(2));
+        assert_eq!(main_vowel_index("ma", Traditional), Some(1));
+        assert_eq!(main_vowel_index("ng", Traditional), None);
     }
 }
