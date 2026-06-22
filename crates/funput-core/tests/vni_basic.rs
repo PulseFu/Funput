@@ -1,6 +1,6 @@
 mod support;
 
-use funput_core::{apply, InputMethod, TransformKind};
+use funput_core::{apply, InputMethod, ToneStyle, TransformKind};
 
 #[test]
 fn vni_stroke_d9() {
@@ -149,7 +149,7 @@ fn vni_complex_syllables() {
 
 #[test]
 fn vni_complex_syllable_step_kinds() {
-    let result = apply("ng", '1', InputMethod::Vni);
+    let result = apply("ng", '1', InputMethod::Vni, ToneStyle::Traditional);
     assert_eq!(result.kind, TransformKind::Ignored);
     assert_eq!(result.text, "ng");
 
@@ -201,21 +201,21 @@ fn vni_shape_targets_receiving_vowel() {
 
 #[test]
 fn vni_validation() {
-    let result = apply("ng", '1', InputMethod::Vni);
+    let result = apply("ng", '1', InputMethod::Vni, ToneStyle::Traditional);
     assert_eq!(result.kind, TransformKind::Ignored);
     assert_eq!(result.text, "ng");
 
-    let result = apply("text", '1', InputMethod::Vni);
+    let result = apply("text", '1', InputMethod::Vni, ToneStyle::Traditional);
     assert_eq!(result.kind, TransformKind::Pending);
     assert_eq!(result.text, "text1");
 
     assert_eq!(support::type_keys(InputMethod::Vni, "ma1"), "má");
 
-    let result = apply("mix", '1', InputMethod::Vni);
+    let result = apply("mix", '1', InputMethod::Vni, ToneStyle::Traditional);
     assert_eq!(result.kind, TransformKind::Applied);
     assert_eq!(result.text, "míx");
 
-    let result = apply("zt", '1', InputMethod::Vni);
+    let result = apply("zt", '1', InputMethod::Vni, ToneStyle::Traditional);
     assert_eq!(result.kind, TransformKind::Pending);
     assert_eq!(result.text, "zt1");
 }

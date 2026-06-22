@@ -25,6 +25,23 @@ struct InputMethodPane: View {
             }
 
             GlassCard {
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    SectionHeader(title: "Kiểu đặt dấu")
+                    Picker("Kiểu đặt dấu", selection: $settings.toneStyle) {
+                        ForEach(ToneStyle.allCases) { style in
+                            Text(style.displayName).tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+
+                    Text(settings.toneStyle.blurb)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            GlassCard {
                 VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                     SectionHeader(title: "Gõ thử")
                     TextField("Gõ ở đây…", text: $demoText, axis: .vertical)

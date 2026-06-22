@@ -1,12 +1,14 @@
 //! IME session state — enabled flag, input method, composition buffer.
 
-use funput_core::InputMethod;
+use funput_core::{InputMethod, ToneStyle};
 
 /// Mutable session held by [`crate::Engine`]. Internal — not part of the public API.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Session {
     pub(crate) enabled: bool,
     pub(crate) method: InputMethod,
+    /// Tone-mark placement style (traditional `hòa` vs modern `hoà`).
+    pub(crate) tone_style: ToneStyle,
     /// Composed text currently shown in the app (the composition span).
     pub(crate) buffer: String,
     /// Raw keystrokes since the last word boundary. Lets English restore
@@ -26,6 +28,7 @@ impl Session {
         Self {
             enabled: true,
             method: InputMethod::Telex,
+            tone_style: ToneStyle::Traditional,
             buffer: String::new(),
             keys: String::new(),
             smart_restore: true,

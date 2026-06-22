@@ -70,6 +70,15 @@ void funput_engine_free(FunputEngine *engine);
 void funput_set_method(FunputEngine *engine, uint8_t method);
 
 /**
+ * Set the tone-mark placement style: `0 = Traditional` (`hòa`), `1 = Modern`
+ * (`hoà`) — any other value = Traditional.
+ *
+ * # Safety
+ * `engine` must be a valid handle or null.
+ */
+void funput_set_tone_style(FunputEngine *engine, uint8_t style);
+
+/**
  * Enable or disable Vietnamese composition.
  *
  * # Safety

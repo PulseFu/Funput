@@ -8,6 +8,7 @@
 use crate::unicode::marks::{tone_on_vowel, vowel_stem, Tone};
 use crate::unicode::shapes::{shape_on_vowel, shaped_vowel_index, strip_shape, VowelShape};
 use crate::unicode::tone_position::tone_vowel_index;
+use crate::ToneStyle;
 
 pub(crate) fn replace_char_at(buffer: &str, char_idx: usize, new_ch: char) -> String {
     let mut chars: Vec<char> = buffer.chars().collect();
@@ -26,9 +27,10 @@ pub fn try_revert_stroke(buffer: &str) -> Option<String> {
     Some(chars.into_iter().collect())
 }
 
-/// Revert tone when the same tone key is pressed on the toned vowel.
-pub fn try_revert_tone(buffer: &str, tone: Tone) -> Option<String> {
-    let vowel_idx = tone_vowel_index(buffer)?;
+/// Revert tone when the same tone key is pressed on the toned vowel. Uses the
+/// active placement `style` so it looks for the tone where that style put it.
+pub fn try_revert_tone(buffer: &str, tone: Tone, style: ToneStyle) -> Option<String> {
+    let vowel_idx = tone_vowel_index(buffer, style)?;
     let vowel = buffer.chars().nth(vowel_idx)?;
     if tone_on_vowel(vowel) != Some(tone) {
         return None;
@@ -91,10 +93,10 @@ mod tests {
 
     #[test]
     fn revert_tone() {
-        assert_eq!(try_revert_tone("á", Tone::Sac), Some("a".into()));
-        assert_eq!(try_revert_tone("hòa", Tone::Huyen), Some("hoa".into()));
-        assert_eq!(try_revert_tone("a", Tone::Sac), None);
-        assert_eq!(try_revert_tone("à", Tone::Sac), None);
+        assert_eq!(try_revert_tone("á", Tone::Sac, ToneStyle::Traditional),Some("a".into()));
+        assert_eq!(try_revert_tone("hòa", Tone::Huyen, ToneStyle::Traditional), Some("hoa".into()));
+        assert_eq!(try_revert_tone("a", Tone::Sac, ToneStyle::Traditional),None);
+        assert_eq!(try_revert_tone("à", Tone::Sac, ToneStyle::Traditional),None);
     }
 
     #[test]
@@ -107,6 +109,6 @@ mod tests {
 
     #[test]
     fn revert_tone_keeps_shape() {
-        assert_eq!(try_revert_tone("ấ", Tone::Sac), Some("â".into()));
+        assert_eq!(try_revert_tone("ấ", Tone::Sac, ToneStyle::Traditional),Some("â".into()));
     }
 }

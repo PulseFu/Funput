@@ -112,7 +112,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Vietnamese input method (Telex & VNI) —
 set(CPACK_PACKAGE_CONTACT "PulseFu <hello@pulsefu.com>")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "PulseFu <hello@pulsefu.com>")
 set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
-set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/pcodedynamics/Funput")
+set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/PulseFu/Funput")
 # fcitx5 must be present; the rest are picked up automatically.
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "fcitx5")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)

@@ -2,12 +2,12 @@
 
 #![allow(dead_code)]
 
-use funput_core::{apply, InputMethod, TransformKind};
+use funput_core::{apply, InputMethod, ToneStyle, TransformKind};
 
 pub fn type_keys(method: InputMethod, keys: &str) -> String {
     let mut buffer = String::new();
     for key in keys.chars() {
-        buffer = apply(&buffer, key, method).text;
+        buffer = apply(&buffer, key, method, ToneStyle::Traditional).text;
     }
     buffer
 }
@@ -24,7 +24,7 @@ pub fn type_keys_with_kinds(method: InputMethod, keys: &str) -> (String, Vec<Tra
     let mut buffer = String::new();
     let mut kinds = Vec::new();
     for key in keys.chars() {
-        let result = apply(&buffer, key, method);
+        let result = apply(&buffer, key, method, ToneStyle::Traditional);
         kinds.push(result.kind);
         buffer = result.text;
     }

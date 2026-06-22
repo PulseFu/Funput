@@ -33,6 +33,18 @@ pub enum InputMethod {
     Telex,
 }
 
+/// Tone-mark placement style — where the tone lands on an open glide-initial
+/// diphthong (`oa`, `oe`, `uy`). The only syllables on which the two styles
+/// disagree; everything else is identical.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ToneStyle {
+    /// "Kiểu cũ": tone on the first vowel — `hòa`, `khỏe`, `thúy`.
+    #[default]
+    Traditional,
+    /// "Kiểu mới": tone on the main (second) vowel — `hoà`, `khoẻ`, `thuý`.
+    Modern,
+}
+
 /// Result kind for a single keystroke transform.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransformKind {
@@ -62,9 +74,9 @@ pub struct TransformResult {
 /// # Examples
 ///
 /// ```
-/// use funput_core::{apply, InputMethod, TransformKind, TransformResult};
+/// use funput_core::{apply, InputMethod, ToneStyle, TransformKind, TransformResult};
 ///
-/// let r = apply("a", '1', InputMethod::Vni);
+/// let r = apply("a", '1', InputMethod::Vni, ToneStyle::Traditional);
 /// assert_eq!(
 ///     r,
 ///     TransformResult {
@@ -75,10 +87,10 @@ pub struct TransformResult {
 /// ```
 pub use validation::syllable::{is_complete_syllable, is_definitely_invalid, is_valid};
 
-pub fn apply(buffer: &str, key: char, method: InputMethod) -> TransformResult {
+pub fn apply(buffer: &str, key: char, method: InputMethod, tone_style: ToneStyle) -> TransformResult {
     match method {
-        InputMethod::Vni => composition::transform::apply_vni(buffer, key),
-        InputMethod::Telex => composition::transform::apply_telex(buffer, key),
+        InputMethod::Vni => composition::transform::apply_vni(buffer, key, tone_style),
+        InputMethod::Telex => composition::transform::apply_telex(buffer, key, tone_style),
     }
 }
 
@@ -88,7 +100,7 @@ mod tests {
 
     #[test]
     fn apply_vni_appends_normal_key() {
-        let result = apply("", 'a', InputMethod::Vni);
+        let result = apply("", 'a', InputMethod::Vni, ToneStyle::Traditional);
         assert_eq!(
             result,
             TransformResult {
@@ -100,7 +112,7 @@ mod tests {
 
     #[test]
     fn apply_telex_tone() {
-        let result = apply("a", 's', InputMethod::Telex);
+        let result = apply("a", 's', InputMethod::Telex, ToneStyle::Modern);
         assert_eq!(
             result,
             TransformResult {

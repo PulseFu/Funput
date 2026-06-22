@@ -59,6 +59,16 @@ impl Engine {
         self.session.method
     }
 
+    /// Set the tone-mark placement style (traditional `hòa` vs modern `hoà`).
+    pub fn set_tone_style(&mut self, style: funput_core::ToneStyle) {
+        self.session.tone_style = style;
+    }
+
+    /// Current tone-mark placement style.
+    pub fn tone_style(&self) -> funput_core::ToneStyle {
+        self.session.tone_style
+    }
+
     /// Toggle auto-restore of non-Vietnamese words to their raw Latin keystrokes
     /// (`card` stays `card` instead of composing `cảd`). When off, the composed
     /// buffer is always kept.
