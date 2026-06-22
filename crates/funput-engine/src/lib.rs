@@ -123,7 +123,7 @@ impl Engine {
     ///   via [`Action::Send`] when `keys != buffer` and buffer is not a complete
     ///   Vietnamese syllable; then clear session. Otherwise pass the boundary key.
     /// - **Normal key:** append to `keys`, call `funput-core`, map
-    ///   `TransformKind` → `ImeResult` (see crate docs / IMPLEMENTATION.md).
+    ///   `TransformKind` → `ImeResult` (see the README).
     pub fn process_char(&mut self, key: char) -> ImeResult {
         if !self.session.enabled {
             return ImeResult::none();

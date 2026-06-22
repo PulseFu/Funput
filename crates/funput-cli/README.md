@@ -1,116 +1,101 @@
 # funput-cli
 
-Binary **công cụ phát triển** — chạy `funput-engine` trực tiếp từ terminal để test, debug, và CI mà không cần build platform shell hay cấp Accessibility.
+Binary **dev-tool** (`funput`) — chạy `funput-engine` thẳng từ terminal để test, debug, và CI mà
+**không** cần build platform shell hay cấp quyền Accessibility.
 
-## Ý nghĩa
+Trả lời nhanh đúng một câu: **"Engine có transform đúng không?"** Không phải IME thật — không hook
+bàn phím, không inject vào app khác. Nó nạp một chuỗi qua engine rồi **mô phỏng vai trò platform**
+(áp từng `ImeResult` vào một app-text model) để in ra text người dùng sẽ thấy.
 
-`funput-cli` là cách nhanh nhất trả lời: **“Engine có transform đúng không?”**
-
-Không thay thế bộ gõ thật trên OS. Không hook keyboard. Chỉ mô phỏng input → output để dev và automated test.
-
-## Trách nhiệm
-
-| Làm | Không làm |
-|-----|-----------|
-| Gọi `funput-engine` với chuỗi key / text | CGEventTap, inject vào app khác |
-| In `ImeResult` (action, backspace, chars) | Production IME cho end user |
-| Test nhanh Telex/VNI từ command line | Settings UI |
-| Scriptable cho CI | FFI export |
-
-## Use cases
-
-### 1. Transform một chuỗi → app-text
-
-Input là **chuỗi literal**; space/dấu câu là word boundary. Output mặc định chỉ in
-text cuối (dễ pipe/diff).
+## Dùng
 
 ```bash
-funput run "a1 b2"               # → á b2       (VNI mặc định)
+# qua cargo (dev)
+cargo run -p funput-cli -- run "a1 b2"                # → á b2       (VNI mặc định)
+cargo run -p funput-cli -- run -m telex "xins chaof"  # → xín chào   (Telex)
+# hoặc cài binary tên `funput`
+cargo install --path crates/funput-cli
 funput run "xin1 chao2"          # → xín chào
-funput run -m telex "xins chaof" # → xín chào   (Telex)
-funput run -m telex "card "      # → card       (English restore khi gặp space)
-funput run -m telex "card"       # → cảd        (chưa boundary → chưa restore)
+funput run -m telex "card "      # → card    (English-restore khi gặp dấu cách)
+funput run -m telex "card"       # → cảd     (chưa tới boundary → chưa restore)
+funput run --steps "a1"          # bảng từng phím
+funput repl -m telex --steps     # REPL: gõ một dòng + Enter; :q hoặc Ctrl-D để thoát
 ```
 
-### 2. Xem từng bước (pipeline)
+CLI:
 
-```bash
-funput run --steps "a1"
-# #   key   action  bs  output   buffer
-# 1   a     None    0   -        a
-# 2   1     Send    1   á        á
-# → á
+```
+funput run  [-m telex|vni] [--steps] <INPUT>   # transform → in app-text (hoặc bảng --steps)
+funput repl [-m telex|vni] [--steps]           # REPL đọc từng dòng
 ```
 
-### 3. REPL tương tác
+- `INPUT` là **chuỗi literal**; dấu cách và dấu câu là **ranh giới từ**. English-restore chỉ kích
+  hoạt tại boundary (Telex `"card "` → `card`; `"card"` → `cảd` vì chưa boundary).
+- `-m, --method` mặc định `vni` (CLI luôn set method tường minh qua `Engine::set_method`).
+- Mặc định in **chỉ app-text** (dễ pipe/diff); `--steps` in bảng từng phím:
 
-```bash
-funput repl              # gõ một dòng + Enter, xem kết quả; :q hoặc Ctrl-D để thoát
-funput repl -m telex --steps
+```
+$ funput run --steps "a1"
+#   key   action  bs  output   buffer
+1   a     None    0   -        a
+2   1     Send    1   á        á
+→ á
 ```
 
-### 4. CI / regression
+REPL **line-based** (không raw-mode → không thêm dep): banner in ra **stderr** để stdout sạch cho
+pipe (`printf 'a1\nd9\n:q\n' | funput repl`).
 
-```bash
-cargo test -p funput-core
-cargo test -p funput-engine
-cargo test -p funput-cli
+## Mô phỏng platform (`sim.rs` — trái tim, thuần, có test)
+
+`simulate(method, input) -> Simulation { app_text, steps }` làm **đúng** việc một platform shell làm:
+áp từng `ImeResult` vào app-text.
+
+```rust
+match result.action {
+    Action::None              => app_text.push(key),            // app nhận phím
+    Action::Send | Restore    => { /* pop `backspace` ký tự */ app_text.push_str(&output) },
+}
 ```
 
-> Lưu ý: restore tiếng Anh chỉ kích hoạt tại **word boundary**. `run -m telex "card"`
-> (không có space cuối) cho thấy trạng thái đang soạn `cảd`; thêm space → `card`.
-
-### 5. Debug khi phát triển platform
-
-Khi macOS inject sai, so sánh:
-
-- Output `funput-cli` (engine đúng)
-- vs hành vi thật trên app (inject layer sai)
-
-→ Tách bug engine vs bug platform.
+`Restore` gộp chung với `Send` để forward-compatible (ESC ở engine sau này). Mỗi `Step` ghi
+`{ key, action, backspace, output, buffer }` cho chế độ `--steps`. `simulate` thuần I/O-free → unit
+test trực tiếp; `main`/`repl` chỉ lo I/O.
 
 ## Cấu trúc module
 
 ```
-funput-cli/src/
-├── main.rs      # clap parse → dispatch run | repl
-├── cli.rs       # clap structs: Cli, Command, MethodArg
-├── sim.rs       # simulate(method, input) → app-text + per-step (pure, có test)
-├── render.rs    # format bảng --steps
-└── repl.rs      # vòng lặp đọc dòng tương tác
+src/
+├── main.rs    # clap parse → dispatch run | repl
+├── cli.rs     # Cli, Command{Run, Repl}, CommonOpts (method + steps), MethodArg
+├── sim.rs     # Method, Step, Simulation, simulate()  ← logic thuần, có test
+├── render.rs  # steps_table(&Simulation) -> String  (bảng --steps)
+└── repl.rs    # vòng lặp đọc dòng tương tác
 ```
 
-## Phụ thuộc
+## Phụ thuộc & ai dùng
 
-```
-funput-cli → funput-engine → funput-core
-```
+- `funput-cli → funput-engine → funput-core`, thêm `clap`. **Không** `funput-ffi` — gọi engine Rust
+  **trực tiếp**, tránh overhead FFI khi dev.
+- Contributor (test local trước khi build app), CI (regression Telex/VNI), maintainer (tái hiện báo
+  lỗi "gõ X ra Y"). **End user không cần** — họ dùng app trong `platforms/`.
 
-**Không** phụ thuộc `funput-ffi` — gọi engine Rust trực tiếp, tránh overhead FFI khi dev.
+Cùng một engine với mọi platform → CLI chỉ là **cửa sổ debug**, không fork logic. Khi platform inject
+sai, so sánh output `funput-cli` (engine đúng) với hành vi app thật để tách bug engine vs bug
+inject.
 
-## Ai dùng?
-
-| Đối tượng | Mục đích |
-|-----------|----------|
-| Contributor | Test local trước khi build macOS app |
-| CI | Regression test Telex/VNI |
-| Maintainer | Debug báo lỗi từ user (“gõ X ra Y”) |
-
-End user **không** cần cài `funput-cli` — họ dùng app trong `platforms/`.
-
-## Quan hệ với platform shell
-
-```
-funput-cli          →  funput-engine  (dev, trực tiếp)
-platforms/macos     →  funput-ffi     → funput-engine  (production)
-platforms/linux     →  funput-engine  (trực tiếp)
-```
-
-Cùng một engine — CLI chỉ là **cửa sổ debug**, không fork logic.
-
-## Build & chạy
+## Tests
 
 ```bash
-cargo run -p funput-cli -- telex "as"
-cargo install --path crates/funput-cli   # optional
+cargo test   -p funput-cli
+cargo clippy -p funput-cli --all-targets -- -D warnings
 ```
+
+Unit test ở `sim.rs`: Telex/VNI cơ bản + đa từ (`xins chaof`→`xín chào`), English-restore ở boundary
+(`card `→`card`, `mas `→`má `), và `--steps` ghi đúng từng phím. Đối chiếu app-text với
+`funput-engine/tests/fixtures/step_cases.rs` để chắc CLI khớp engine.
+
+## Còn làm
+
+- **Chưa expose `ToneStyle`**: CLI chỉ có `-m method`, nên đang chạy theo kiểu đặt dấu mặc định của
+  engine (`Traditional`). Thêm cờ `--tone-style traditional|modern` để test được kiểu mới.
+- **REPL per-keystroke** (raw-mode, cần `crossterm`) — hiện chỉ line-based.

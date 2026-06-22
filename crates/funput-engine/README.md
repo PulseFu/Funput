@@ -1,118 +1,141 @@
 # funput-engine
 
-Crate **điều phối** — nhận sự kiện phím theo thời gian, giữ buffer, gọi `funput-core`, trả kết quả cho platform inject.
+Crate **điều phối có trạng thái**: nhận từng phím theo thời gian, giữ buffer đang soạn, gọi
+`funput-core` rồi trả về một `ImeResult` cho biết **platform cần làm gì** (xoá mấy ký tự, chèn chuỗi
+gì). Không hook bàn phím, không inject, không C ABI, không UI.
 
-**API FROZEN (Phase E4)** — public surface: `Engine`, `Action`, `ImeResult`.
+## Crate này làm gì
 
-## Ý nghĩa
+`funput-core` trả lời "chuỗi này transform thành gì". `funput-engine` trả lời:
 
-`funput-core` trả lời “chuỗi này transform thành gì”.  
-`funput-engine` trả lời **“sau key này, platform cần làm gì?”**
+> Sau phím vừa nhập, **platform cần làm gì** — pass phím, nuốt phím, xoá bao nhiêu ký tự, chèn gì?
 
-Đây là **single source of truth** cho trạng thái gõ: buffer đang composition, kiểu gõ đang chọn, bật/tắt, ranh giới từ.
-
-## Trách nhiệm
-
-| Làm | Không làm |
-|-----|-----------|
-| Session / buffer theo input context | Hook keyboard (CGEventTap, …) |
-| Gọi `funput-core` khi có key mới | Inject Backspace / Unicode vào app |
-| Tính `backspace` count (buffer cũ vs mới) | UI settings, menu bar |
-| Trả `ImeResult` cho platform | Logic Telex/VNI chi tiết |
-| Word boundary + English restore | C ABI export (thuộc `funput-ffi`) |
-| Bật/tắt engine, đổi Telex/VNI | Shortcut / gõ tắt (phase 2) |
+Đây là **single source of truth** cho trạng thái gõ: buffer composition, kiểu gõ (Telex/VNI), kiểu
+đặt dấu, bật/tắt, ranh giới từ, và khôi phục tiếng Anh.
 
 ## `ImeResult` — contract với platform
 
-Struct trung tâm mà mọi platform shell consume:
-
 ```rust
 pub enum Action {
-    None,    // Pass key through — không transform
-    Send,    // Transform — platform phải inject
-    Restore, // Hoàn nguyên buffer (ví dụ ESC, E5+)
+    None,    // Pass phím qua app — không transform
+    Send,    // Transform — xoá `backspace` ký tự rồi chèn `output`
+    Restore, // Hoàn nguyên về Latin gốc (ESC, …)
 }
 
 pub struct ImeResult {
     pub action: Action,
-    pub backspace: usize,    // Số ký tự cần xóa trong app
-    pub output: String,      // Chuỗi inject sau khi xóa
+    pub backspace: usize,  // số ký tự cần xoá trong app
+    pub output: String,    // chuỗi chèn sau khi xoá
 }
 ```
 
-`ImeResult` là kiểu Rust-native. `funput-ffi` mới marshal sang struct `#[repr(C)]`
-(`backspace: u8`, `chars: [u32; 32]`, `count: u8`) ở biên FFI — giới hạn 32 ký tự /
-`u8` và chính sách tràn nằm ở đó, không ở engine.
+`ImeResult` là kiểu Rust-native. `funput-ffi` mới marshal nó sang `#[repr(C)]` ở biên FFI
+(`backspace: u32`, `count: u32`, `chars: [u32; 64]`) — giới hạn 64 ký tự và chính sách tràn nằm ở
+đó, **không** ở engine. Platform đọc `ImeResult` rồi tự quyết **cách** inject (Backspace+Unicode,
+preedit/marked text…); logic inject không thuộc crate này.
 
-Platform đọc `ImeResult` rồi quyết định **cách inject** (Backspace, Selection, AX-sync) — logic inject **không** nằm trong crate này.
+## Engine API
+
+| Method | Mô tả |
+|--------|-------|
+| `new()` | Tạo engine (mặc định: bật, Telex, Traditional) |
+| `process_char(key: char) -> ImeResult` | Xử lý một Unicode scalar (platform tự map keycode → char) |
+| `on_backspace() -> ImeResult` | User bấm Backspace khi đang soạn → đồng bộ buffer |
+| `set_enabled(bool)` / `is_enabled()` | Bật/tắt gõ tiếng Việt (English pass-through) |
+| `set_method(InputMethod)` / `method()` | Telex ↔ VNI |
+| `set_tone_style(ToneStyle)` / `tone_style()` | Kiểu đặt dấu (truyền thống `hòa` / hiện đại `hoà`) |
+| `set_smart_restore(bool)` | Tự khôi phục từ không phải tiếng Việt về Latin gốc |
+| `set_eager_restore(bool)` | Khôi phục ngay khi biết chắc, không đợi dấu cách |
+| `clear()` | Reset buffer + keys (ranh giới từ, đổi focus) |
+| `buffer() -> &str` | Text đang soạn — platform dùng để vẽ preedit/marked text |
+| `keys() -> &str` | Chuỗi phím thô từ ranh giới từ gần nhất — dùng để khôi phục tiếng Anh |
+
+Re-export: `Action`, `ImeResult` (từ `result.rs`). Đổi breaking cần đồng bộ semver với `funput-ffi`.
 
 ## Luồng xử lý một phím
 
 ```
-1. Platform gọi engine.process_char(key)
-2. Engine cập nhật buffer / keys
-3. Engine gọi funput-core transform (hoặc boundary restore)
-4. Engine so sánh buffer trước / sau → tính backspace + output
-5. Trả ImeResult
+platform → engine.process_char(key)
+   ├─ ranh giới từ (space / dấu câu)? → boundary: (English restore | giữ) rồi clear()
+   └─ ngược lại → funput-core::apply(buffer, key, method, tone_style)
+        → diff(buffer cũ, buffer mới) → (backspace, output)
+        → cập nhật session.buffer → ImeResult
 ```
 
-### Ví dụ: Telex `a` → `s` → `á`
+Ví dụ Telex `a` → `s` → `á`:
 
-| Bước | Key | Action | Backspace | Output |
-|------|-----|--------|-----------|--------|
-| 1 | `a` | `None` | 0 | — (chờ thêm key) |
-| 2 | `s` | `Send` | 1 | `á` |
+| Phím | Action | backspace | output |
+|------|--------|-----------|--------|
+| `a` | `None` | 0 | — (chờ phím sau) |
+| `s` | `Send` | 1 | `á` |
 
-Platform nhận bước 2: xóa 1 ký tự, inject `á`, nuốt key `s`.
+Platform ở bước 2: xoá 1 ký tự, chèn `á`, nuốt phím `s`.
 
-## Cấu trúc module (E4)
+## `TransformKind` → `ImeResult`
 
-```
-funput-engine/src/
-├── lib.rs                # Engine, API FROZEN, re-exports
-├── result.rs             # Action, ImeResult
-├── session.rs            # enabled, method, buffer, keys
-├── boundary.rs           # word boundary + English restore
-├── pipeline.rs           # TransformKind → ImeResult
-└── diff.rs               # buffer diff → backspace + output
+Quy tắc ánh xạ kết quả của core sang hành động platform:
 
-tests/
-├── support/mod.rs        # type_keys_with_results, app_text, …
-├── fixtures/step_cases.rs
-├── engine_fixtures.rs    # engine_full_regression
-├── telex_steps.rs
-├── vni_steps.rs
-├── word_boundary.rs
-└── english_restore.rs
-```
+| `TransformKind` (core) | `action` | `session.buffer` sau | backspace / output |
+|------------------------|----------|----------------------|--------------------|
+| `Pending` | `None` (pass phím) | `result.text` (= cũ + phím) | 0 / — |
+| `Ignored` | `None` (pass phím) | `cũ + phím` (engine tự append) | 0 / — |
+| `Applied` | `Send` (nuốt phím) | `result.text` | diff(cũ, mới) |
+| `Reverted` | `Send` (nuốt phím) | `result.text` | diff(cũ, mới) |
 
-## Phụ thuộc
+`Pending`/`Ignored` đều biến phím thành ký tự thường để app ↔ buffer luôn đồng bộ — chỉ khác ở chỗ
+core đã append sẵn (`Pending`) hay engine tự ghép (`Ignored`). Khi `enabled = false`, engine bỏ qua
+core hoàn toàn (`Action::None`).
+
+### diff (buffer cũ → mới)
 
 ```
-funput-engine → funput-core
+prefix  = số ký tự chung ở đầu
+backspace = cũ.chars().count() - prefix
+output    = mới.chars().skip(prefix).collect()
 ```
 
-## Ai gọi crate này?
+`hoa` → `hoà`: prefix 2 (`ho`) → backspace 1, output `à`. `diff` trả `(usize, String)`, **không**
+cap — ràng buộc kích thước chỉ áp ở `funput-ffi`.
 
-| Consumer | Cách gọi |
-|----------|----------|
-| `funput-ffi` | Wrap API C cho Swift / native |
-| `funput-cli` | Test trực tiếp từ terminal |
-| `platforms/linux/fcitx5-funput` | Link Rust trực tiếp (không qua FFI) |
+## Khôi phục tiếng Anh
 
-Platform macOS/Windows **không** import trực tiếp — đi qua `funput-ffi`.
+Khi gõ từ tiếng Anh, core vẫn bỏ dấu (`card` → `cảd`). Tại ranh giới từ, nếu buffer **không** phải
+âm tiết tiếng Việt hoàn chỉnh (`funput_core::is_complete_syllable`, strict) và `keys != buffer` →
+engine `Send` lại **chuỗi phím thô** (`keys`) + phím ranh giới, rồi `clear()`. `eager_restore` làm
+việc này ngay khi buffer trở thành dead-end thay vì đợi dấu cách.
 
-## Hiện thực
+Không từ điển: từ tiếng Anh tình cờ là âm tiết VN hợp lệ (`test` → `tét`) sẽ **không** auto-restore
+— đổi lại không bao giờ phá tiếng Việt đang gõ đúng (giống UniKey không từ điển).
 
-Xem [IMPLEMENTATION.md](./IMPLEMENTATION.md) — roadmap E0–E4 hoàn tất; tiếp theo `funput-cli`.
+## Cấu trúc module
+
+```
+src/
+├── lib.rs        # Engine + public API, re-export Action/ImeResult
+├── result.rs     # Action, ImeResult
+├── session.rs    # state: enabled, method, tone_style, buffer, keys, smart/eager restore
+├── pipeline.rs   # process(session, key): TransformKind → ImeResult
+├── boundary.rs   # ranh giới từ + quyết định English restore
+└── diff.rs       # buffer diff → (backspace, output)
+```
+
+## Phụ thuộc & ai gọi
+
+- Phụ thuộc: chỉ `funput-core`. **Không** `serde`, không platform crate.
+- **Consumer link engine trực tiếp (Rust):** `funput-ffi`, `funput-cli`, và **Windows shell**
+  (`platforms/windows/src-tauri` giữ `Engine` trong process).
+- **Qua `funput-ffi` (C ABI):** macOS (Swift IMKit) và addon Fcitx5 trên Linux (C++). Hai nền này
+  **không** link engine trực tiếp.
 
 ## Tests
 
 ```bash
-cargo test -p funput-engine
+cargo test   -p funput-engine
+cargo test   -p funput-engine engine_full_regression
 cargo clippy -p funput-engine -- -D warnings
-cargo doc -p funput-engine --no-deps
+cargo doc    -p funput-engine --no-deps
 ```
 
-**E4:** Fixture regression (`engine_full_regression`) — buffer parity Telex/VNI với core,
-step vectors (`as`, `dd`, `card ` restore), app-text multi-word + English restore.
+`tests/`: step vectors Telex/VNI (`telex_steps.rs`, `vni_steps.rs`), ranh giới từ
+(`word_boundary.rs`), khôi phục tiếng Anh (`english_restore.rs`), fixture regression
+(`engine_fixtures.rs` + `fixtures/step_cases.rs`), helper ở `support/`.

@@ -1,113 +1,117 @@
 # funput-ffi
 
-Crate **C ABI boundary** — export API ổn định cho platform native (Swift trên macOS, C#/C++ trên Windows) gọi `funput-engine` mà không cần viết Rust ở phía UI.
+Biên **C ABI** cho `funput-engine` — để shell **không phải Rust** gọi engine qua hàm C. Engine chạy
+trong `.dylib`/`.so`/`.a`; phía native (Swift, C++) load và gọi.
 
-## Ý nghĩa
+> Consumer **Rust** (Windows shell, `funput-cli`) link `funput-engine` trực tiếp và **không** cần
+> crate này. FFI chỉ dành cho **macOS** (Swift IMKit) và **addon Fcitx5 trên Linux** (C++).
 
-Rust engine chạy trong `.dylib` / `.dll` / `.so`. Platform shell (Swift, C#) load library và gọi hàm C — đây là cầu nối giữa **Rust core** và **native hook/inject layer**.
+## Crate này làm gì
 
-Linux Fcitx5 có thể link `funput-engine` trực tiếp và **không cần** crate này.
+Chỉ **marshal tại biên**: `extern "C"` + `#[repr(C)]`, chuyển `ImeResult` (Rust) ↔ `FunputResult`
+(C), null-safety. **Không** logic Telex/VNI, **không** hook/inject — đó là việc của engine và
+platform.
 
-## Trách nhiệm
+## C API (`include/funput.h`)
 
-| Làm | Không làm |
-|-----|-----------|
-| Export `extern "C"` functions | Logic Telex/VNI |
-| Chuyển `ImeResult` → struct C (`#[repr(C)]`) | CGEventTap, keyboard hook |
-| Quản lý vòng đời init / free result | Settings UI |
-| Thread-safe singleton engine (nếu cần) | Inject text vào app |
-| `cbindgen` / header generation | Fcitx5 integration |
-
-## API (C ABI — `include/funput.h`)
-
-Handle-based, kết quả trả **theo giá trị** (không cần free), input là **codepoint**
-(platform tự map keycode→char):
+Handle-based; kết quả trả **theo giá trị** (POD, không cần free); input là **codepoint** (platform
+tự map keycode → char). Mọi hàm **null-safe** (handle null / codepoint không hợp lệ → kết quả
+`None`).
 
 ```c
 typedef struct FunputEngine FunputEngine;   // opaque handle
 
 typedef struct {
     uint8_t  action;        // 0=None, 1=Send, 2=Restore
-    uint32_t backspace;     // số ký tự xoá trước khi inject
+    uint32_t backspace;     // số ký tự xoá trước khi chèn
     uint32_t count;         // số codepoint hợp lệ trong chars (<= 64)
-    uint32_t chars[64];     // UTF-32 output; chars[0..count] valid
+    uint32_t chars[64];     // UTF-32 output; chars[0..count] hợp lệ
 } FunputResult;
 
-FunputEngine* funput_engine_new(void);
-void          funput_engine_free(FunputEngine*);
-void          funput_set_method(FunputEngine*, uint8_t method);   // 0=Telex, 1=VNI
-void          funput_set_enabled(FunputEngine*, bool enabled);
-void          funput_clear(FunputEngine*);                        // word boundary
-FunputResult  funput_process_char(FunputEngine*, uint32_t codepoint);
+FunputEngine *funput_engine_new(void);
+void          funput_engine_free(FunputEngine *engine);
+
+void          funput_set_method(FunputEngine *engine, uint8_t method);      // 0=Telex, 1=VNI
+void          funput_set_tone_style(FunputEngine *engine, uint8_t style);   // 0=Traditional, 1=Modern
+void          funput_set_enabled(FunputEngine *engine, bool enabled);
+void          funput_set_smart_restore(FunputEngine *engine, bool on);
+void          funput_set_eager_restore(FunputEngine *engine, bool on);
+void          funput_clear(FunputEngine *engine);                            // ranh giới từ / đổi focus
+
+FunputResult  funput_process_char(FunputEngine *engine, uint32_t codepoint);
+FunputResult  funput_backspace(FunputEngine *engine);                       // Backspace khi đang soạn
+uintptr_t     funput_buffer(const FunputEngine *engine, uint32_t *out, uintptr_t cap); // chép buffer đang soạn (UTF-32) vào out, trả số ký tự
 ```
 
-Mọi hàm **null-safe**. Header sinh bằng `cbindgen` (xem `scripts/gen-header.sh`).
+Áp kết quả: `action == 0 (None)` → để app nhận phím như thường; ngược lại xoá `backspace` ký tự rồi
+chèn `chars[0..count]`. `funput_buffer` để platform vẽ preedit/marked text từ buffer đang soạn.
+
+Header sinh bằng **cbindgen** (đã commit). Regen sau khi đổi `extern "C"` surface:
+
+```bash
+bash scripts/gen-header.sh    # cần: cargo install cbindgen
+```
+
+## Marshalling (`src/types.rs`)
+
+`FunputResult::from_ime(&ImeResult)`:
+- `Action::{None, Send, Restore}` → `0 / 1 / 2`.
+- `output.chars()` → `chars[..count]`, **cắt** ở `CHARS_CAP = 64` (chính sách tràn nằm ở đây, không
+  ở engine).
+- `backspace as u32`. Input `char::from_u32(codepoint)`; `None` → kết quả rỗng.
+
+## Sở hữu bộ nhớ
+
+| Bên | Trách nhiệm |
+|-----|-------------|
+| Rust (`funput_engine_new`) | Cấp phát handle |
+| Caller (Swift/C++) | Gọi `funput_engine_free()` đúng **một lần** mỗi handle |
+| `funput_process_char` / `funput_backspace` | Trả **by value** — không cấp phát, không free per-result |
+
+Chỉ cần free **handle** (Swift thường `deinit { funput_engine_free(handle) }`). Result là POD trên
+stack → không rò rỉ.
 
 ## Luồng trên macOS (ví dụ)
 
 ```
-CGEventTap callback (Swift)
-       ↓ keycode → codepoint (platform map)
-funput_process_char(engine, cp)    ← funput-ffi
-       ↓
-funput-engine
-       ↓
-FunputResult (by value) → Swift đọc action / backspace / chars[0..count]
-       ↓
-Inject layer (Backspace / AX-sync)   ← ngoài funput-ffi
+IMKInputController.handle (Swift)
+   └─ keycode → codepoint
+      funput_process_char(engine, cp)        ← funput-ffi
+         └─ funput-engine → FunputResult (by value)
+            Swift đọc action / backspace / chars[0..count]
+            → setMarkedText / insertText      ← ngoài funput-ffi
 ```
 
-## Memory ownership
-
-| Bên | Trách nhiệm |
-|-----|------------|
-| Rust (`funput_engine_new`) | Cấp phát handle |
-| Caller (Swift/C#) | Gọi `funput_engine_free()` đúng một lần mỗi handle |
-| `funput_process_char` | Trả **by value** — **không** cấp phát, **không** free per-result |
-
-Chỉ cần free **handle** (thường `defer funput_engine_free(e)` trong Swift). Result là POD trên stack → không rò rỉ.
-
-## Cấu trúc module
+## Cấu trúc & build
 
 ```
-funput-ffi/
-├── src/lib.rs            # extern "C" exports + opaque FunputEngine
-├── src/types.rs          # #[repr(C)] FunputResult + from_ime()
-├── cbindgen.toml
-├── scripts/gen-header.sh
-└── include/funput.h      # Generated via cbindgen (committed)
+src/lib.rs          # extern "C" exports + opaque FunputEngine (newtype quanh Engine)
+src/types.rs        # #[repr(C)] FunputResult + from_ime() + CHARS_CAP/ACTION_*
+cbindgen.toml
+scripts/gen-header.sh
+include/funput.h     # GENERATED (committed)
 ```
 
-## Build output
+`crate-type = ["cdylib", "staticlib", "rlib"]`. Artifact: macOS `libfunput_ffi.a`/`.dylib` + header
+(build qua `platforms/macos/scripts/build-ffi.sh`); Windows không dùng (shell link engine trực
+tiếp); Linux addon Fcitx5 link `libfunput_ffi` + include `funput.h`.
 
-| Platform | Artifact |
-|----------|----------|
-| macOS | `libfunput_ffi.dylib` + `funput.h` |
-| Windows | `funput_ffi.dll` + `.lib` |
-| Linux | Không bắt buộc (Fcitx5 link trực tiếp engine) |
+Lưu ý edition 2024: dùng `#[unsafe(no_mangle)]` và `unsafe { }` tường minh quanh
+`Box::from_raw` / `ptr.as_mut()`.
 
-Script build trong `platforms/macos/scripts/build-rust.sh` compile crate này với target phù hợp.
+## Phụ thuộc & ai gọi
 
-## Phụ thuộc
-
-```
-funput-ffi → funput-engine → funput-core
-```
-
-## Ai gọi crate này?
-
-| Consumer | Ghi chú |
-|----------|---------|
-| `platforms/macos/Funput/Bridge/` | Swift qua bridging header |
-| `platforms/windows/` | P/Invoke hoặc C++ link |
-| **Không** | `funput-cli`, Fcitx5 (link engine trực tiếp) |
+- `funput-ffi → funput-engine → funput-core`.
+- Consumer: `platforms/macos` (Swift, bridging header) và `platforms/linux/fcitx5` (C++,
+  `ffi_handle.h`). **Không** dùng: `funput-cli`, Windows shell (đều link engine trực tiếp).
 
 ## Tests
 
-FFI layer nên có test round-trip:
-
 ```bash
-cargo test -p funput-ffi
+cargo test  -p funput-ffi
+cargo clippy -p funput-ffi --all-targets -- -D warnings
+cargo build -p funput-ffi && ls target/debug/libfunput_ffi.*   # .a .dylib .rlib
 ```
 
-Kiểm tra: gọi `ime_key` qua C ABI → parse result → `ime_free` không leak.
+`src/types.rs` (unit: `from_ime`, truncate > 64) + `tests/round_trip.rs` (gọi `extern "C"` như C
+caller: Telex/VNI/English-restore, null-safety, surrogate).
