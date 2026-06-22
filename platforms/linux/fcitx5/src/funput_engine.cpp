@@ -91,7 +91,9 @@ void FunputEngine::noteRecentApp(const std::string &program) {
 void FunputEngine::updatePreedit(fcitx::InputContext *ic) {
     const std::string s = handle_.buffer();
     fcitx::Text preedit;
-    if (!s.empty()) preedit.append(s, fcitx::TextFormatFlag::Underline);
+    const auto flag = settings_.composingUnderline ? fcitx::TextFormatFlag::Underline
+                                                   : fcitx::TextFormatFlag::NoFlag;
+    if (!s.empty()) preedit.append(s, flag);
     preedit.setCursor(static_cast<int>(s.size()));
 
     auto &panel = ic->inputPanel();

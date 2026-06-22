@@ -56,6 +56,10 @@ pub struct Settings {
     pub toggle_hotkey: Hotkey,
     pub launch_at_login: bool,
     pub has_completed_onboarding: bool,
+    /// Underline composing text (preedit). `#[serde(default)]` (false) keeps older
+    /// settings files loadable. The Fcitx5 addon reads this to style the preedit.
+    #[serde(default)]
+    pub composing_underline: bool,
     /// Apps that default to English on focus. `#[serde(default)]` keeps older
     /// settings files (without this key) loadable instead of resetting to defaults.
     #[serde(default)]
@@ -74,6 +78,7 @@ impl Default for Settings {
             launch_at_login: false,
             has_completed_onboarding: false,
             excluded_apps: Vec::new(),
+            composing_underline: false,
         }
     }
 }

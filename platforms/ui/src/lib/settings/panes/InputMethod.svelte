@@ -4,6 +4,7 @@
   import GlassCard from "../../components/GlassCard.svelte";
   import SettingsRow from "../../components/SettingsRow.svelte";
   import Segmented from "../../components/Segmented.svelte";
+  import Toggle from "../../components/Toggle.svelte";
 
   let { settings }: { settings: api.Settings } = $props();
 
@@ -25,6 +26,11 @@
   function pickTone(t: api.ToneStyle) {
     settings.toneStyle = t;
     api.setToneStyle(t);
+  }
+
+  function setUnderline(on: boolean) {
+    settings.composingUnderline = on;
+    api.setComposingUnderline(on);
   }
 </script>
 
@@ -58,6 +64,19 @@
       {/snippet}
     </SettingsRow>
   </GlassCard>
+
+  {#if api.isLinux}
+    <GlassCard>
+      <SettingsRow
+        title="Gạch chân khi đang gõ"
+        subtitle="Tắt để chữ trông như đã gõ xong (giống Windows)."
+      >
+        {#snippet control()}
+          <Toggle checked={settings.composingUnderline} onchange={setUnderline} />
+        {/snippet}
+      </SettingsRow>
+    </GlassCard>
+  {/if}
 
   <GlassCard>
     <div class="try-label">Gõ thử</div>

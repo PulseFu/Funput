@@ -49,6 +49,11 @@ pub fn set_tone_style(tone_style: ToneStyle) {
 }
 
 #[tauri::command]
+pub fn set_composing_underline(on: bool) {
+    Settings::update(|s| s.composing_underline = on);
+}
+
+#[tauri::command]
 pub fn set_enabled(on: bool) {
     Settings::update(|s| s.enabled = on);
 }
