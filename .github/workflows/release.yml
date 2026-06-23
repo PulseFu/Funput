@@ -12,6 +12,13 @@ on:
 permissions:
   contents: write
 
+# Cargo network resilience for all jobs that build Rust. CI runners intermittently
+# hit "curl HTTP2 framing layer" (error 16) errors fetching crates from crates.io;
+# forcing HTTP/1.1 avoids the bug, and a higher retry count rides out blips.
+env:
+  CARGO_HTTP_MULTIPLEXING: "false"
+  CARGO_NET_RETRY: "5"
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
