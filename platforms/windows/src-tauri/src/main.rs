@@ -64,9 +64,14 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("failed to build Funput")
         .run(|_app, event| {
-            // Tray-only app: keep running even when no window is open.
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
+            // Tray-only app: keep running when a window closes (`code` is `None`),
+            // but let an explicit quit through. The "Thoát" menu calls
+            // `app.exit(0)`, which raises `ExitRequested` with `code: Some(_)` —
+            // preventing that too is what kept the app from quitting.
+            if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
+                if code.is_none() {
+                    api.prevent_exit();
+                }
             }
         });
 }
