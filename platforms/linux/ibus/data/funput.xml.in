@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Funput IBus component. Installed to <datadir>/ibus/component/funput.xml;
+     ibus-daemon reads it at startup and launches <exec> on demand. The @VARS@
+     are substituted by CMake (configure_file) so <exec> matches the install path. -->
+<component>
+  <name>org.freedesktop.IBus.Funput</name>
+  <description>Funput Vietnamese Input Method (Telex &amp; VNI)</description>
+  <exec>@IBUS_ENGINE_PATH@ --ibus</exec>
+  <version>@FUNPUT_VERSION@</version>
+  <author>PulseFu</author>
+  <license>MIT</license>
+  <homepage>https://github.com/PulseFu/Funput</homepage>
+  <textdomain>funput</textdomain>
+  <engines>
+    <engine>
+      <name>funput</name>
+      <longname>Funput</longname>
+      <description>Vietnamese Telex &amp; VNI</description>
+      <language>vi</language>
+      <license>MIT</license>
+      <author>PulseFu</author>
+      <icon>funput</icon>
+      <layout>us</layout>
+      <symbol>FU</symbol>
+      <rank>99</rank>
+    </engine>
+  </engines>
+</component>

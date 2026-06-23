@@ -18,41 +18,27 @@ endif()
 
 find_package(Fcitx5Core REQUIRED)
 find_package(Fcitx5Utils REQUIRED)
-find_package(nlohmann_json 3 REQUIRED)
 
 include(GNUInstallDirs)
 
-# --- Rust core (funput-ffi) -> libfunput_ffi.so ----------------------------
-# The pure typing logic lives in Rust; this addon is a thin C++ shell that calls
-# the cbindgen-generated C ABI. We build the cdylib via cargo and link it in.
-get_filename_component(FUNPUT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
-set(FUNPUT_FFI_INCLUDE "${FUNPUT_ROOT}/crates/funput-ffi/include")
-set(FUNPUT_FFI_SO "${FUNPUT_ROOT}/target/release/libfunput_ffi.so")
-
-find_program(CARGO_EXECUTABLE cargo REQUIRED)
-
-add_custom_command(
-    OUTPUT "${FUNPUT_FFI_SO}"
-    COMMAND ${CARGO_EXECUTABLE} build --release -p funput-ffi
-    WORKING_DIRECTORY "${FUNPUT_ROOT}"
-    COMMENT "Building funput-ffi (Rust cdylib)"
-    VERBATIM
-)
-add_custom_target(funput_ffi DEPENDS "${FUNPUT_FFI_SO}")
+# --- Shared Linux code (settings reader + FFI wrapper + Rust cdylib build) --
+# Lives in platforms/linux/common, shared with the IBus shell. Owns building
+# libfunput_ffi.so and exposes (PUBLIC) the common headers, funput.h, and the .so
+# to link — plus the FUNPUT_ROOT / FUNPUT_FFI_SO cache vars used below.
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../common"
+                 "${CMAKE_BINARY_DIR}/common")
 
 # --- Fcitx5 addon -> libfunput.so ------------------------------------------
 add_library(funput MODULE
     src/funput_engine.cpp
-    src/settings.cpp
 )
 add_dependencies(funput funput_ffi)
 
-target_include_directories(funput PRIVATE "${FUNPUT_FFI_INCLUDE}")
+# funput_linux_common carries the FFI include dir + the .so transitively.
 target_link_libraries(funput PRIVATE
     Fcitx5::Core
     Fcitx5::Utils
-    nlohmann_json::nlohmann_json
-    "${FUNPUT_FFI_SO}"
+    funput_linux_common
 )
 
 # libfunput_ffi.so is installed next to libfunput.so; resolve it via $ORIGIN so
@@ -76,11 +62,17 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/funput-addon.conf"
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/funput.conf"
         DESTINATION "${FCITX_INSTALL_PKGDATADIR}/inputmethod")
 
-# Tray / input-method icon (referenced as Icon=funput).
+# Tray / input-method icon (referenced as Icon=funput). Ship the scalable SVG so
+# it renders crisp at any size; the 512px PNG goes in its real size bucket.
+if(EXISTS "${FUNPUT_ROOT}/assets/svg/funput_logo.svg")
+    install(FILES "${FUNPUT_ROOT}/assets/svg/funput_logo.svg"
+            RENAME funput.svg
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps")
+endif()
 if(EXISTS "${FUNPUT_ROOT}/assets/logo.png")
     install(FILES "${FUNPUT_ROOT}/assets/logo.png"
             RENAME funput.png
-            DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps")
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps")
 endif()
 
 # --- Tauri Settings app (built separately by cargo) ------------------------

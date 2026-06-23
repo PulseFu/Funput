@@ -9,6 +9,8 @@
 #include <fcitx-utils/keysym.h>
 #include <nlohmann/json.hpp>
 
+#include "boundary.h" // funput::isBoundary, shared with the IBus shell
+
 namespace {
 
 using json = nlohmann::json;
@@ -23,16 +25,6 @@ std::string recentAppsPath() {
         return p;
     }
     return {};
-}
-
-// Word boundary — ASCII whitespace or punctuation, digits excluded (VNI uses
-// them as tone modifiers). Mirrors funput_core's rule and the macOS shell.
-bool isBoundary(char32_t s) {
-    if (s > 0x7F) return false;
-    if (s == U' ' || s == U'\t' || s == U'\n' || s == U'\r') return true;
-    const uint32_t v = static_cast<uint32_t>(s);
-    return (v >= 0x21 && v <= 0x2F) || (v >= 0x3A && v <= 0x40) ||
-           (v >= 0x5B && v <= 0x60) || (v >= 0x7B && v <= 0x7E);
 }
 
 } // namespace
@@ -206,7 +198,7 @@ void FunputEngine::keyEvent(const fcitx::InputMethodEntry &, fcitx::KeyEvent &ke
     }
 
     const char32_t scalar = static_cast<char32_t>(uc);
-    if (isBoundary(scalar)) {
+    if (funput::isBoundary(scalar)) {
         if (handleBoundary(ic, scalar)) keyEvent.filterAndAccept();
         return;
     }
