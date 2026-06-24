@@ -79,12 +79,12 @@ if(EXISTS "${FUNPUT_ROOT}/assets/logo.png")
             DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps")
 endif()
 
-# --- Tauri Settings app (built separately by cargo) ------------------------
+# --- GTK4 Settings app (built separately by cargo) -------------------------
 # Self-contained packaging: an IBus-only user still gets the Settings GUI. The
 # shared funput-common package that would de-dup this is deferred to a later PR.
 set(FUNPUT_SETTINGS_BIN
-    "${CMAKE_CURRENT_SOURCE_DIR}/../src-tauri/target/release/funput-settings"
-    CACHE FILEPATH "Path to the built Tauri Settings binary")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../settings-gtk/target/release/funput-settings"
+    CACHE FILEPATH "Path to the built GTK4 Settings binary")
 
 if(EXISTS "${FUNPUT_SETTINGS_BIN}")
     install(PROGRAMS "${FUNPUT_SETTINGS_BIN}" DESTINATION "${CMAKE_INSTALL_BINDIR}")
