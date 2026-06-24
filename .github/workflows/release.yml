@@ -128,7 +128,7 @@ jobs:
           printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > "$KEYFILE"
           "$TOOLS/bin/generate_appcast" \
             --ed-key-file "$KEYFILE" \
-            --download-url-prefix "https://github.com/pcodedynamics/Funput/releases/download/v$VERSION/" \
+            --download-url-prefix "https://github.com/Funput/Funput/releases/download/v$VERSION/" \
             -o "$ARCHIVES/appcast.xml" \
             "$ARCHIVES"
           rm -f "$KEYFILE"
