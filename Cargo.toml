@@ -13,7 +13,9 @@ members = [
 # stays green on macOS/Linux dev machines; build it from its own dir on Windows.
 exclude = [
     "platforms/windows/src-tauri",
-    "platforms/linux/src-tauri",
+    # GTK4 Settings app: links system gtk4/libadwaita (Linux-only). Build from its
+    # own dir on Linux so `cargo test --workspace` stays green on macOS/Windows.
+    "platforms/linux/settings-gtk",
 ]
 
 [workspace.package]

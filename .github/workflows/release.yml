@@ -216,48 +216,31 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          # Fcitx5 + IBus shell toolchains + JSON, and the Tauri (webkit2gtk) deps.
+          # Fcitx5 + IBus shell toolchains + JSON, and the GTK4/libadwaita Settings deps.
           sudo apt-get install -y \
             cmake nlohmann-json3-dev \
             fcitx5 libfcitx5core-dev libfcitx5utils-dev libfcitx5config-dev \
             ibus libibus-1.0-dev libglib2.0-dev \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+            libgtk-4-dev libadwaita-1-dev librsvg2-dev
 
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             . -> target
-            platforms/linux/src-tauri -> target
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
+            platforms/linux/settings-gtk -> target
 
       - name: Stamp version from tag
         if: needs.version.outputs.version != ''
         run: |
           V="${{ needs.version.outputs.version }}"
-          # Stamp only the app version (read by getVersion / shown in Settings). Do
-          # NOT stamp the crate version in Cargo.toml — it would diverge from the
-          # committed Cargo.lock and break `cargo build --locked` below. The crate
-          # version is internal/cosmetic; the .deb version comes from -DFUNPUT_VERSION.
-          node -e "const fs=require('fs');const f='platforms/linux/src-tauri/tauri.conf.json';const j=JSON.parse(fs.readFileSync(f));j.version=process.argv[1];fs.writeFileSync(f,JSON.stringify(j,null,2)+'\n')" "$V"
+          # Stamp the GUI crate version (shown in the Settings "Giới thiệu" page via
+          # CARGO_PKG_VERSION). The .deb version comes separately from -DFUNPUT_VERSION.
+          sed -i -E "0,/^version = \".*\"/s//version = \"$V\"/" platforms/linux/settings-gtk/Cargo.toml
 
-      - name: Build shared UI
-        run: |
-          pnpm -C platforms/ui install --no-frozen-lockfile
-          pnpm -C platforms/ui build
-
-      - name: Build Settings app (Tauri)
-        working-directory: platforms/linux/src-tauri
-        # --locked: use the committed Cargo.lock instead of re-resolving against the
-        # live crates.io index (avoids flaky resolution, e.g. on the arm64 runner).
-        run: cargo build --release --locked
+      - name: Build Settings app (GTK4 + libadwaita)
+        working-directory: platforms/linux/settings-gtk
+        run: cargo build --release
 
       - name: Build addons + .debs
         run: |

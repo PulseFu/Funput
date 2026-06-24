@@ -1,7 +1,11 @@
 //! Persisted user settings (`~/.config/Funput/settings.json`) — the same file the
-//! Fcitx5 addon reads. Field names serialize to camelCase to match the web UI
-//! (`platforms/ui/src/lib/api.ts`). Unlike the Windows shell, this process never
-//! drives the engine; it only reads and writes this file.
+//! Fcitx5 addon and IBus engine read. Field names serialize to camelCase so the
+//! schema stays identical to the C++ reader (`platforms/linux/common/settings.cpp`)
+//! and the previous Tauri shell. This process never drives the engine; it only
+//! reads and writes this file (the engine picks changes up on its next focus-in).
+//!
+//! Ported verbatim from the retired Tauri shell; keep the serde attributes
+//! unchanged or the engine will stop reading the file.
 
 use std::fs;
 use std::path::PathBuf;
@@ -16,7 +20,7 @@ pub enum Method {
 }
 
 /// Tone-mark placement style (traditional `hòa` vs modern `hoà`). This process only
-/// persists it to settings.json; the Fcitx5 addon reads it and drives the engine.
+/// persists it to settings.json; the engine reads it and applies it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ToneStyle {
@@ -25,7 +29,8 @@ pub enum ToneStyle {
     Modern,
 }
 
-/// VI/EN toggle hotkey presets. The Fcitx5 addon maps these to keysyms.
+/// VI/EN toggle hotkey presets. The engine maps these to keysyms. `AltShift` is not
+/// yet supported by the Linux engine (see README); the UI surfaces it with a note.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Hotkey {
@@ -113,7 +118,9 @@ impl Settings {
         }
     }
 
-    /// Load, mutate one field, save — the shape every setter command needs.
+    /// Load, mutate one field, save — the shape every control's change handler needs.
+    /// Loading fresh each time avoids clobbering writes the engine made meanwhile
+    /// (it rewrites the file when VI/EN is toggled from the keyboard).
     pub fn update(f: impl FnOnce(&mut Settings)) -> Settings {
         let mut s = Settings::load();
         f(&mut s);

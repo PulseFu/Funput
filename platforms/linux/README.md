@@ -25,19 +25,19 @@ platforms/linux/
 │  ├─ src/engine.cpp         IBusEngine: process_key_event → preedit/commit
 │  ├─ src/main.cpp           IBusBus + IBusFactory + ibus_main (cờ --ibus/--xml)
 │  └─ data/funput.xml.in     component manifest (ibus-daemon đăng ký + exec engine)
-├─ src-tauri/   App Settings/Onboarding (Tauri 2 + Svelte). KHÔNG hook, KHÔNG engine.
+├─ settings-gtk/ App Settings/Onboarding (GTK4 + libadwaita, Rust). KHÔNG hook, KHÔNG engine.
 └─ packaging/   .desktop launcher (CPack gộp vào .deb)
 ```
 
-> `src-tauri` chỉ build trên **Linux** (kéo theo webkit2gtk) và **bị `exclude`** khỏi workspace gốc,
-> nên `cargo test --workspace` trên macOS vẫn xanh. Addon là project **CMake** riêng.
+> `settings-gtk` chỉ build trên **Linux** (link gtk4/libadwaita hệ thống) và **bị `exclude`** khỏi
+> workspace gốc, nên `cargo test --workspace` trên macOS vẫn xanh. Addon là project **CMake** riêng.
 
 ## Hai tiến trình, một file settings
 
-Addon `.so` do daemon `fcitx5` nạp; app Tauri là tiến trình riêng → **không** chia sẻ state trong
-process như Windows. Cầu nối là `~/.config/Funput/settings.json` (cùng file `dirs::config_dir()` mà
-bản Windows ghi). App Tauri ghi file; addon đọc lại khi **focus-in** (so mtime, rẻ). Bật/tắt VI–EN
-bằng hotkey trong addon cũng ghi ngược lại file để UI phản ánh đúng.
+Addon `.so` do daemon `fcitx5` nạp; app Settings (GTK) là tiến trình riêng → **không** chia sẻ state
+trong process như Windows. Cầu nối là `~/.config/Funput/settings.json` (cùng file `dirs::config_dir()`
+mà bản Windows ghi). App Settings ghi file; addon đọc lại khi **focus-in** (so mtime, rẻ). Bật/tắt
+VI–EN bằng hotkey trong addon cũng ghi ngược lại file để UI phản ánh đúng.
 
 Tray + biểu tượng trạng thái dùng luôn của **Fcitx5** (không dựng tray riêng).
 
@@ -50,8 +50,8 @@ sudo apt install \
   cmake nlohmann-json3-dev \
   fcitx5 libfcitx5core-dev libfcitx5utils-dev libfcitx5config-dev \
   ibus libibus-1.0-dev libglib2.0-dev \
-  libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-# + Rust (rustup), pnpm.
+  libgtk-4-dev libadwaita-1-dev librsvg2-dev
+# + Rust (rustup). Yêu cầu Ubuntu 24.04+ (GTK 4.14 / libadwaita 1.5) cho app Settings.
 # Chỉ dựng một shell? Bỏ qua dev-lib của shell kia (fcitx5* hoặc ibus/libibus*).
 ```
 
@@ -60,8 +60,7 @@ Một lệnh dựng cả hai gói `.deb`:
 ```sh
 platforms/linux/build.sh
 # → cargo build -p funput-ffi  (cdylib)
-# → pnpm -C platforms/ui build (Svelte → dist)
-# → cargo build (Tauri Settings)
+# → cargo build (Settings app — GTK4 + libadwaita)
 # → cmake + cpack × {fcitx5, ibus}
 # Kết quả:
 #   platforms/linux/build/fcitx5/funput_<version>_<arch>.deb
@@ -96,7 +95,7 @@ Cài thử: `sudo apt install ./platforms/linux/build/fcitx5/funput_*.deb`
 2. Nạp lại engine mới đăng ký: `ibus restart` (hoặc đăng nhập lại).
 3. **Settings → Keyboard → Input Sources → +** → **Vietnamese** → **Funput**.
 4. Chuyển nguồn nhập: **`Super + Space`**. Bật/tắt VI–EN khi đang ở Funput: **`Ctrl + `` `**.
-5. Đổi Telex/VNI, smart/eager restore: mở **Funput** trong menu ứng dụng (app Tauri Settings).
+5. Đổi Telex/VNI, smart/eager restore: mở **Funput** trong menu ứng dụng (app Settings GTK).
 
 > Smoke test không cần session: `ibus-engine-funput --xml` phải in ra component XML hợp lệ.
 
@@ -106,7 +105,7 @@ Cài thử: `sudo apt install ./platforms/linux/build/fcitx5/funput_*.deb`
 2. Nếu Fcitx5 chưa chạy: đăng nhập lại, hoặc đảm bảo `GTK_IM_MODULE=fcitx`, `QT_IM_MODULE=fcitx`,
    `XMODIFIERS=@im=fcitx` (X11) — Wayland đời mới dùng `text-input-v3` nên thường không cần.
 3. Bật/tắt tiếng Việt: **`Ctrl + `` `** (mặc định) hoặc icon Fcitx5 ở khay.
-4. Đổi Telex/VNI, smart/eager restore: mở **Funput** trong menu ứng dụng (app Tauri Settings).
+4. Đổi Telex/VNI, smart/eager restore: mở **Funput** trong menu ứng dụng (app Settings GTK).
 
 ## Verify (trên Linux, X11 lẫn Wayland)
 
@@ -127,4 +126,4 @@ Mở một app GTK (gedit) và một app Qt:
   mỗi gói tự bundle `libfunput_ffi.so` + app Settings (gói chung `funput-common` để sau).
 - Hotkey `alt_shift` (combo chỉ-modifier) chưa hỗ trợ; dùng `ctrl_backtick`/`ctrl_space`.
 - Settings đồng bộ theo **mtime ở lần focus-in kế tiếp** — có thể trễ một nhịp (inotify để sau).
-- Cửa sổ Settings dùng nền trong suốt; cần compositor (GNOME/KDE đời mới có sẵn).
+- App Settings là **GTK4 + libadwaita**, yêu cầu **Ubuntu 24.04+** (GTK 4.14 / libadwaita 1.5).

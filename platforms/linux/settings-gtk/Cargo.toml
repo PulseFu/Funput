@@ -1,0 +1,22 @@
+[package]
+name = "funput-settings"
+version = "1.2026.1"
+edition = "2021"
+description = "Funput Settings & Onboarding (GTK4 + libadwaita) for Linux"
+publish = false
+
+# Single binary; the name is the contract with packaging — both CMakeLists and the
+# funput-settings.desktop launcher expect a `funput-settings` executable.
+[[bin]]
+name = "funput-settings"
+path = "src/main.rs"
+
+# Targets Ubuntu 24.04+ (GTK 4.14 / libadwaita 1.5). Feature gates are kept at the
+# minimum we actually use (v4_10 for gtk, v1_4 for the Adw rows) so the crate links
+# against 24.04's system libraries.
+[dependencies]
+gtk = { package = "gtk4", version = "0.9", features = ["v4_10"] }
+adw = { package = "libadwaita", version = "0.7", features = ["v1_4"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "5"
