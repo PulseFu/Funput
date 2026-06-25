@@ -23,14 +23,12 @@ pub fn open_settings() {
     if let Some(win) = SETTINGS.with(|c| c.borrow().as_ref().map(|w| w.clone_strong())) {
         populate_settings(&win);
         let _ = win.show();
-        apply_backdrop(win.window());
         return;
     }
     let win = SettingsWindow::new().expect("create settings window");
     populate_settings(&win);
     wire_settings(&win);
     let _ = win.show();
-    apply_backdrop(win.window());
     SETTINGS.with(|c| *c.borrow_mut() = Some(win));
 }
 
@@ -123,7 +121,6 @@ pub fn open_onboarding() {
     if let Some(win) = ONBOARDING.with(|c| c.borrow().as_ref().map(|w| w.clone_strong())) {
         win.set_step(0);
         let _ = win.show();
-        apply_backdrop(win.window());
         return;
     }
     let win = OnboardingWindow::new().expect("create onboarding window");
@@ -151,7 +148,6 @@ pub fn open_onboarding() {
     });
 
     let _ = win.show();
-    apply_backdrop(win.window());
     ONBOARDING.with(|c| *c.borrow_mut() = Some(win));
 }
 
@@ -171,38 +167,4 @@ fn apps_model(apps: &[crate::settings::ExcludedApp]) -> ModelRc<AppEntry> {
         })
         .collect();
     ModelRc::new(VecModel::from(rows))
-}
-
-/// Apply the Win11 Mica backdrop, matching the system light/dark setting. The
-/// window must already be shown (the HWND has to exist).
-fn apply_backdrop(window: &slint::Window) {
-    #[cfg(windows)]
-    {
-        let _ = window_vibrancy::apply_mica(window.window_handle(), Some(is_dark_mode()));
-    }
-    #[cfg(not(windows))]
-    let _ = window;
-}
-
-/// Read the system "apps" theme: `AppsUseLightTheme == 0` means dark mode.
-#[cfg(windows)]
-fn is_dark_mode() -> bool {
-    use windows::core::w;
-    use windows::Win32::Foundation::ERROR_SUCCESS;
-    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
-
-    let mut data: u32 = 1;
-    let mut size: u32 = std::mem::size_of::<u32>() as u32;
-    let status = unsafe {
-        RegGetValueW(
-            HKEY_CURRENT_USER,
-            w!("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
-            w!("AppsUseLightTheme"),
-            RRF_RT_REG_DWORD,
-            None,
-            Some(&mut data as *mut u32 as *mut core::ffi::c_void),
-            Some(&mut size),
-        )
-    };
-    status == ERROR_SUCCESS && data == 0
 }

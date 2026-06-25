@@ -2,7 +2,7 @@
 // Rust (`windows_ui.rs`) sets the `in`/`in-out` properties and handles the
 // callbacks; the window background is transparent so the Mica backdrop shows.
 
-import { Palette, Button, Switch, ScrollView, LineEdit } from "std-widgets.slint";
+import { Palette, Button, Switch, ScrollView } from "std-widgets.slint";
 import { Theme, Card, Row, Segmented, KeyCap, Dot, SegOption, AppEntry } from "theme.slint";
 
 export { AppEntry }
@@ -11,7 +11,7 @@ export component SettingsWindow inherits Window {
     title: "Funput — Cài đặt";
     width: 720px;
     height: 480px;
-    background: transparent;
+    background: Theme.window-bg;
 
     // --- state from Rust ---
     in property <string> method;
@@ -56,33 +56,44 @@ export component SettingsWindow inherits Window {
             VerticalLayout {
                 padding: Theme.sp-md;
                 spacing: 2px;
+                alignment: start;
                 Text {
                     text: "Funput";
-                    font-size: 13px;
+                    font-size: 14px;
                     font-weight: 700;
-                    color: Theme.subtle;
+                    color: Palette.foreground;
                 }
-                Rectangle { height: Theme.sp-sm; }
+                Rectangle { height: Theme.sp-md; }
                 for item in root.nav: Rectangle {
-                    height: 34px;
+                    height: 36px;
                     border-radius: Theme.r-control;
                     background: root.active == item.id
-                        ? Theme.accent
-                        : (nav-touch.has-hover ? Palette.control-background : transparent);
+                        ? Theme.nav-active
+                        : (nav-touch.has-hover ? Theme.nav-hover : transparent);
+                    // Left accent indicator for the active item.
+                    if root.active == item.id: Rectangle {
+                        x: 0;
+                        y: (parent.height - 18px) / 2;
+                        width: 3px;
+                        height: 18px;
+                        border-radius: 1.5px;
+                        background: Theme.accent;
+                    }
                     HorizontalLayout {
-                        padding-left: 10px;
+                        padding-left: 12px;
                         spacing: Theme.sp-sm;
                         Text {
                             text: item.icon;
                             vertical-alignment: center;
                             font-size: 14px;
-                            color: root.active == item.id ? Theme.accent-text : Palette.foreground;
+                            color: root.active == item.id ? Theme.accent : Palette.foreground;
                         }
                         Text {
                             text: item.label;
                             vertical-alignment: center;
                             font-size: 13px;
-                            color: root.active == item.id ? Theme.accent-text : Palette.foreground;
+                            font-weight: root.active == item.id ? 600 : 400;
+                            color: Palette.foreground;
                         }
                     }
                     nav-touch := TouchArea {
@@ -128,19 +139,6 @@ export component SettingsWindow inherits Window {
                                 options: [{ id: "traditional", label: "Truyền thống" }, { id: "modern", label: "Hiện đại" }];
                                 current: root.tone-style;
                                 changed(v) => { root.pick-tone(v); }
-                            }
-                        }
-                    }
-                    Card {
-                        VerticalLayout {
-                            spacing: Theme.sp-sm;
-                            Text { text: "Gõ thử"; font-size: 13px; font-weight: 600; color: Theme.subtle; }
-                            LineEdit { placeholder-text: "Gõ ở đây…"; }
-                            Text {
-                                text: "Bản xem trước giao diện — gõ tiếng Việt thật ở mọi app khi Funput đang chạy.";
-                                font-size: 12px;
-                                color: Theme.subtle;
-                                wrap: word-wrap;
                             }
                         }
                     }
@@ -322,7 +320,7 @@ export component OnboardingWindow inherits Window {
     title: "Chào mừng đến Funput";
     width: 460px;
     height: 540px;
-    background: transparent;
+    background: Theme.window-bg;
 
     in property <string> method;
     in-out property <bool> launch-at-login;

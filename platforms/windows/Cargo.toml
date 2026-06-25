@@ -19,9 +19,8 @@ winresource = "0.1"
 
 [dependencies]
 # Native UI. Default features bring the winit backend + FemtoVG renderer; the
-# Fluent (Windows 11) widget style is selected in build.rs. `raw-window-handle-06`
-# exposes the HWND so we can apply the Mica backdrop.
-slint = { version = "1.17", features = ["raw-window-handle-06"] }
+# Fluent (Windows 11) widget style is selected in build.rs.
+slint = "1.17"
 # Tray icon + menu — the standalone crate Tauri itself wraps, so no WebView2. The
 # menu types come from tray-icon's re-exported `muda` (kept version-matched).
 tray-icon = "0.24"
@@ -29,8 +28,6 @@ tray-icon = "0.24"
 auto-launch = "0.5"
 # Open external links in the system browser.
 open = "5"
-# Mica / Acrylic window backdrop via DWM; works on any raw-window-handle.
-window-vibrancy = "0.7"
 # Decode the tray PNGs to RGBA for `tray_icon::Icon::from_rgba`.
 image = { version = "0.25", default-features = false, features = ["png"] }
 serde = { version = "1", features = ["derive"] }
@@ -48,7 +45,6 @@ windows = { version = "0.58", features = [
     "Win32_UI_Accessibility",
     "Win32_System_LibraryLoader",
     "Win32_System_Threading",
-    "Win32_System_Registry",
 ] }
 
 [profile.release]

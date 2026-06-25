@@ -1,6 +1,7 @@
 // Shared design tokens + reusable widgets for the Funput Settings/Onboarding
-// windows. Colors come from the Fluent `Palette` so the UI follows the system
-// light/dark theme (to match the Mica backdrop); the brand accent stays fixed.
+// windows. Colors adapt to the system light/dark theme via the Fluent `Palette`
+// color-scheme; the brand accent stays fixed. Cards sit on a soft window gradient
+// with a drop shadow for depth (a reliable, polished look across machines).
 
 import { Palette } from "std-widgets.slint";
 
@@ -16,6 +17,8 @@ export struct AppEntry {
 }
 
 export global Theme {
+    out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+
     // Funput brand accent (kept across platforms; #5b63f5).
     out property <color> accent: #5b63f5;
     out property <color> accent-text: #ffffff;
@@ -23,33 +26,39 @@ export global Theme {
     out property <length> sp-xs: 4px;
     out property <length> sp-sm: 8px;
     out property <length> sp-md: 14px;
-    out property <length> sp-lg: 20px;
-    out property <length> sp-xl: 32px;
+    out property <length> sp-lg: 18px;
+    out property <length> sp-xl: 28px;
 
-    out property <length> r-card: 12px;
-    out property <length> r-control: 8px;
+    out property <length> r-card: 14px;
+    out property <length> r-control: 9px;
 
-    out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+    // Window backdrop gradient (no Mica dependency).
+    out property <brush> window-bg: root.dark
+        ? @linear-gradient(180deg, #20222b 0%, #181920 100%)
+        : @linear-gradient(180deg, #eef0f6 0%, #e4e6ef 60%, #dadce8 100%);
 
-    // Semi-transparent fills so the Mica backdrop shows through; dim text shades.
-    // Defined as light/dark literals (avoids brush methods on Palette).
-    out property <brush> card-bg: root.dark ? #2c2c30d9 : #ffffffd9;
-    out property <brush> sidebar-bg: root.dark ? #1c1c2055 : #ffffff70;
-    out property <color> subtle: root.dark ? #ffffff99 : #1c1c1e99;
+    out property <brush> card-bg: root.dark ? #2b2c33f2 : #fffffff2;
+    out property <color> card-border: root.dark ? #ffffff1f : #0000000f;
+    out property <color> shadow: root.dark ? #00000099 : #0000002b;
+    out property <brush> sidebar-bg: root.dark ? #ffffff0d : #ffffff66;
+    out property <brush> track: root.dark ? #ffffff1f : #00000012;
+    out property <brush> nav-active: root.dark ? #5b63f540 : #5b63f524;
+    out property <brush> nav-hover: root.dark ? #ffffff14 : #0000000a;
+    out property <color> subtle: root.dark ? #ffffffb3 : #1c1c1eb3;
     out property <color> faint: root.dark ? #ffffff80 : #1c1c1e80;
 }
 
 // A small keycap badge, e.g. for "Ctrl" + "`".
 export component KeyCap inherits Rectangle {
     in property <string> label;
-    height: 22px;
-    border-radius: 5px;
-    background: Palette.control-background;
+    height: 23px;
+    border-radius: 6px;
+    background: Theme.track;
     border-width: 1px;
-    border-color: Palette.border;
+    border-color: Theme.card-border;
     HorizontalLayout {
-        padding-left: 7px;
-        padding-right: 7px;
+        padding-left: 8px;
+        padding-right: 8px;
         Text {
             text: root.label;
             vertical-alignment: center;
@@ -65,7 +74,10 @@ export component Card inherits Rectangle {
     border-radius: Theme.r-card;
     background: Theme.card-bg;
     border-width: 1px;
-    border-color: Palette.border;
+    border-color: Theme.card-border;
+    drop-shadow-blur: 16px;
+    drop-shadow-color: Theme.shadow;
+    drop-shadow-offset-y: 3px;
     VerticalLayout {
         padding: Theme.sp-lg;
         spacing: Theme.sp-md;
@@ -82,10 +94,11 @@ export component Row {
         VerticalLayout {
             horizontal-stretch: 1;
             alignment: center;
-            spacing: 2px;
+            spacing: 3px;
             Text {
                 text: root.title;
                 font-size: 14px;
+                font-weight: 600;
                 color: Palette.foreground;
             }
             if root.subtitle != "": Text {
@@ -103,34 +116,39 @@ export component Row {
     }
 }
 
-// A pill segmented control. `current` highlights the active option; `changed`
-// fires the chosen option's id (state lives in the parent, not here).
+// A pill segmented control sitting in a subtle track. `current` highlights the
+// active option; `changed` fires the chosen option's id (state lives in the parent).
 export component Segmented {
     in property <[SegOption]> options;
     in property <string> current;
     callback changed(string);
-    HorizontalLayout {
-        spacing: 3px;
-        for opt in root.options: Rectangle {
-            background: opt.id == root.current ? Theme.accent : Palette.control-background;
-            border-radius: Theme.r-control;
-            HorizontalLayout {
-                padding-left: 12px;
-                padding-right: 12px;
-                padding-top: 6px;
-                padding-bottom: 6px;
-                Text {
-                    text: opt.label;
-                    color: opt.id == root.current ? Theme.accent-text : Palette.foreground;
-                    font-size: 13px;
-                    font-weight: opt.id == root.current ? 600 : 400;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
+    Rectangle {
+        background: Theme.track;
+        border-radius: Theme.r-control + 3px;
+        HorizontalLayout {
+            padding: 2px;
+            spacing: 2px;
+            for opt in root.options: Rectangle {
+                background: opt.id == root.current ? Theme.accent : transparent;
+                border-radius: Theme.r-control;
+                HorizontalLayout {
+                    padding-left: 14px;
+                    padding-right: 14px;
+                    padding-top: 7px;
+                    padding-bottom: 7px;
+                    Text {
+                        text: opt.label;
+                        color: opt.id == root.current ? Theme.accent-text : Palette.foreground;
+                        font-size: 13px;
+                        font-weight: opt.id == root.current ? 600 : 500;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
                 }
-            }
-            TouchArea {
-                clicked => {
-                    root.changed(opt.id);
+                TouchArea {
+                    clicked => {
+                        root.changed(opt.id);
+                    }
                 }
             }
         }
@@ -140,8 +158,9 @@ export component Segmented {
 // A progress dot for the onboarding wizard.
 export component Dot inherits Rectangle {
     in property <bool> on;
-    width: 7px;
+    width: root.on ? 20px : 7px;
     height: 7px;
     border-radius: 3.5px;
-    background: root.on ? Theme.accent : Palette.control-background;
+    background: root.on ? Theme.accent : Theme.track;
+    animate width { duration: 150ms; easing: ease-in-out; }
 }
