@@ -1,4 +1,0 @@
-# pnpm 11 reads the build-script allow-list here. esbuild needs its postinstall to
-# place the platform binary that Vite uses.
-allowBuilds:
-  esbuild: true

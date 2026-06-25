@@ -1,4 +1,0 @@
-node_modules/
-dist/
-.svelte-kit/
-*.tsbuildinfo

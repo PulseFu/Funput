@@ -1,0 +1,171 @@
+// Shared design tokens + reusable widgets for Funput's Settings/Onboarding
+// windows — a macOS-style "liquid glass" look. Translucent panels sit over a soft
+// multi-colour field drawn inside the window (see the backdrop blobs in app.slint);
+// colours adapt to the system light/dark theme via `Palette.color-scheme`.
+
+import { Palette } from "std-widgets.slint";
+
+export struct SegOption {
+    id: string,
+    label: string,
+}
+
+// One excluded / recent application row. Mirrors `settings::ExcludedApp`.
+export struct AppEntry {
+    id: string,
+    name: string,
+}
+
+export global Theme {
+    out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+
+    // Funput brand accent — the violet at the heart of the logo ribbon.
+    out property <color> accent: #9333ea;
+    out property <color> accent-text: #ffffff;
+
+    out property <length> sp-xs: 4px;
+    out property <length> sp-sm: 8px;
+    out property <length> sp-md: 14px;
+    out property <length> sp-lg: 18px;
+    out property <length> sp-xl: 28px;
+
+    out property <length> r-card: 16px;
+    out property <length> r-control: 10px;
+
+    // Base window wash (the colour blobs are layered on top of this in app.slint).
+    out property <brush> window-base: root.dark
+        ? @linear-gradient(160deg, #1c1d27 0%, #15161d 100%)
+        : @linear-gradient(160deg, #eef0fb 0%, #e6e8f5 100%);
+
+    // Glass surfaces: translucent fills + a bright edge so they read as frosted.
+    out property <brush> card-bg: root.dark ? #ffffff17 : #ffffff8c;
+    out property <color> card-border: root.dark ? #ffffff24 : #ffffffa6;
+    out property <color> shadow: root.dark ? #00000066 : #2a235e26;
+
+    out property <brush> sidebar-bg: root.dark ? #ffffff0d : #ffffff52;
+    out property <color> sidebar-border: root.dark ? #ffffff1c : #ffffff8c;
+
+    out property <brush> track: root.dark ? #ffffff1a : #6e6a8c2b;
+    out property <brush> nav-active: root.dark ? #ffffff1f : #ffffffbf;
+    out property <brush> nav-hover: root.dark ? #ffffff12 : #ffffff66;
+
+    out property <color> subtle: root.dark ? #a8a4bb : #6f6b86;
+    out property <color> faint: root.dark ? #817d95 : #908ca6;
+}
+
+// A small keycap badge, e.g. for "Ctrl" + "`".
+export component KeyCap inherits Rectangle {
+    in property <string> label;
+    height: 23px;
+    border-radius: 6px;
+    background: Theme.track;
+    border-width: 1px;
+    border-color: Theme.card-border;
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        Text {
+            text: root.label;
+            vertical-alignment: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: Palette.foreground;
+        }
+    }
+}
+
+// A frosted glass card; callers drop rows/controls inside as children.
+export component Card inherits Rectangle {
+    border-radius: Theme.r-card;
+    background: Theme.card-bg;
+    border-width: 1px;
+    border-color: Theme.card-border;
+    drop-shadow-blur: 22px;
+    drop-shadow-color: Theme.shadow;
+    drop-shadow-offset-y: 6px;
+    VerticalLayout {
+        padding: Theme.sp-lg;
+        spacing: Theme.sp-md;
+        @children
+    }
+}
+
+// A settings row: title (+ optional subtitle) on the left, control(s) on the right.
+export component Row {
+    in property <string> title;
+    in property <string> subtitle;
+    HorizontalLayout {
+        spacing: Theme.sp-md;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 3px;
+            Text {
+                text: root.title;
+                font-size: 14px;
+                font-weight: 600;
+                color: Palette.foreground;
+            }
+            if root.subtitle != "": Text {
+                text: root.subtitle;
+                font-size: 12px;
+                color: Theme.subtle;
+                wrap: word-wrap;
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 0;
+            alignment: center;
+            @children
+        }
+    }
+}
+
+// A pill segmented control sitting in a translucent track. `current` highlights the
+// active option; `changed` fires the chosen option's id (state lives in the parent).
+export component Segmented {
+    in property <[SegOption]> options;
+    in property <string> current;
+    callback changed(string);
+    Rectangle {
+        background: Theme.track;
+        border-radius: Theme.r-control + 3px;
+        HorizontalLayout {
+            padding: 2px;
+            spacing: 2px;
+            for opt in root.options: Rectangle {
+                background: opt.id == root.current ? Theme.accent : transparent;
+                border-radius: Theme.r-control;
+                HorizontalLayout {
+                    padding-left: 14px;
+                    padding-right: 14px;
+                    padding-top: 7px;
+                    padding-bottom: 7px;
+                    Text {
+                        text: opt.label;
+                        color: opt.id == root.current ? Theme.accent-text : Palette.foreground;
+                        font-size: 13px;
+                        font-weight: opt.id == root.current ? 600 : 500;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+                TouchArea {
+                    clicked => {
+                        root.changed(opt.id);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// A progress dot for the onboarding wizard.
+export component Dot inherits Rectangle {
+    in property <bool> on;
+    width: root.on ? 20px : 7px;
+    height: 7px;
+    border-radius: 3.5px;
+    background: root.on ? Theme.accent : Theme.track;
+    animate width { duration: 150ms; easing: ease-in-out; }
+}
