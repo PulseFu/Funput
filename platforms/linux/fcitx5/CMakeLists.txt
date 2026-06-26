@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(funput-fcitx5 VERSION 1.2026.1 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+# C++20: Fcitx5 5.1+ public headers (log.h, stringutils.h) use std::span and
+# std::string_view::starts_with/ends_with. Fedora ships that newer Fcitx5, so 17
+# fails to compile its headers; Ubuntu's older Fcitx5 builds fine at 20 too.
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
