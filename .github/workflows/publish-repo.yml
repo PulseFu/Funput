@@ -116,18 +116,20 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-          # Passphrase via a file, not inline in the macro: keeps it out of rpm's
-          # arg list and survives special chars (%, ", spaces) that would break
-          # macro expansion / shell quoting.
+          # Allow loopback pinentry so gpg can take the passphrase non-interactively.
+          mkdir -p "$HOME/.gnupg" && chmod 700 "$HOME/.gnupg"
+          echo 'allow-loopback-pinentry' >> "$HOME/.gnupg/gpg-agent.conf"
+          gpgconf --kill gpg-agent || true
+          # Passphrase in a file (kept out of rpm's arg list; survives %, ", spaces).
           printf '%s' "$GPG_PASSPHRASE" > "$HOME/.gpg-pass"
-          # rpmsign drives gpg through %__gpg_sign_cmd. %{__gpg} is already the gpg
-          # binary path — do NOT add a literal "gpg" after it, or rpm passes "gpg" as
-          # the first argument and gpg aborts with "no command supplied". Written with
-          # echo so the macros start at column 0 (rpm ignores indented ones — a
-          # YAML-block heredoc would prepend the run-step indentation).
+          # Do NOT redefine %__gpg_sign_cmd: its filename placeholders
+          # (%{__plaintext_filename}/%{__signature_filename}) are rpm-internal and
+          # only resolve inside rpm's own default command — hand-rolling the command
+          # leaves them literal. Instead inject loopback + passphrase through rpm's
+          # official extension point and let the default sign command stand.
           {
             echo '%_gpg_name hello@funput.app'
-            echo "%__gpg_sign_cmd %{__gpg} --batch --no-armor --pinentry-mode loopback --passphrase-file $HOME/.gpg-pass --no-secmem-warning -u \"%{_gpg_name}\" -sbo %{__signature_filename} %{__plaintext_filename}"
+            echo "%_gpg_sign_cmd_extra_args --pinentry-mode loopback --passphrase-file $HOME/.gpg-pass"
           } > "$HOME/.rpmmacros"
           rpm --addsign tree/rpm/*.rpm
           createrepo_c tree/rpm
