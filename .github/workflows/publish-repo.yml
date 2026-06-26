@@ -116,17 +116,24 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-          # rpmsign drives gpg non-interactively via this macro (loopback passphrase).
-          # Written with printf so the macros start at column 0 (rpm ignores indented
-          # ones — a YAML-block heredoc would prepend the run-step indentation).
+          # Passphrase via a file, not inline in the macro: keeps it out of rpm's
+          # arg list and survives special chars (%, ", spaces) that would break
+          # macro expansion / shell quoting.
+          printf '%s' "$GPG_PASSPHRASE" > "$HOME/.gpg-pass"
+          # rpmsign drives gpg through %__gpg_sign_cmd. %{__gpg} is already the gpg
+          # binary path — do NOT add a literal "gpg" after it, or rpm passes "gpg" as
+          # the first argument and gpg aborts with "no command supplied". Written with
+          # echo so the macros start at column 0 (rpm ignores indented ones — a
+          # YAML-block heredoc would prepend the run-step indentation).
           {
             echo '%_gpg_name hello@funput.app'
-            echo "%__gpg_sign_cmd %{__gpg} gpg --batch --no-armor --pinentry-mode loopback --passphrase $GPG_PASSPHRASE --no-secmem-warning -u \"%{_gpg_name}\" -sbo %{__signature_filename} %{__plaintext_filename}"
+            echo "%__gpg_sign_cmd %{__gpg} --batch --no-armor --pinentry-mode loopback --passphrase-file $HOME/.gpg-pass --no-secmem-warning -u \"%{_gpg_name}\" -sbo %{__signature_filename} %{__plaintext_filename}"
           } > "$HOME/.rpmmacros"
           rpm --addsign tree/rpm/*.rpm
           createrepo_c tree/rpm
-          gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+          gpg --batch --yes --pinentry-mode loopback --passphrase-file "$HOME/.gpg-pass" \
             --detach-sign --armor tree/rpm/repodata/repomd.xml
+          rm -f "$HOME/.gpg-pass"
 
       - uses: actions/upload-artifact@v4
         with:
