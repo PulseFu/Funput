@@ -346,12 +346,6 @@ export component SettingsWindow inherits Window {
                             Text { text: "Funput"; font-size: 18px; font-weight: 700; horizontal-alignment: center; color: Palette.foreground; }
                             Text { text: "Bộ gõ tiếng Việt — miễn phí, mã nguồn mở."; font-size: 13px; horizontal-alignment: center; color: Theme.subtle; }
                             Text { text: "Phiên bản \{root.version}"; font-size: 12px; horizontal-alignment: center; color: Theme.subtle; }
-                            HorizontalLayout {
-                                alignment: center;
-                                spacing: Theme.sp-sm;
-                                Button { text: "GitHub"; clicked => { root.open-link("https://github.com/Funput/Funput"); } }
-                                Button { text: "Website"; clicked => { root.open-link("https://funput.app/"); } }
-                            }
 
                             // --- Cập nhật ---
                             if root.update-state != "idle": Text {
@@ -388,6 +382,12 @@ export component SettingsWindow inherits Window {
                                     text: "Khởi động lại";
                                     clicked => { root.relaunch-now(); }
                                 }
+                            }
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: Theme.sp-sm;
+                                Button { text: "GitHub"; clicked => { root.open-link("https://github.com/Funput/Funput"); } }
+                                Button { text: "Website"; clicked => { root.open-link("https://funput.app/"); } }
                             }
                         }
                     }

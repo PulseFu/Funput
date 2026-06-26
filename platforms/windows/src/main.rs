@@ -10,6 +10,7 @@ compile_error!("funput-windows builds only on Windows (global keyboard hook + Se
 slint::include_modules!();
 
 mod commands;
+mod dark_mode;
 mod hook;
 mod inject;
 mod keymap;
@@ -20,6 +21,10 @@ mod update;
 mod windows_ui;
 
 fn main() {
+    // Let Windows draw the tray's right-click menu dark when the system is dark.
+    // Process-global, so set it before the tray (on the hook thread) is created.
+    dark_mode::allow_dark_menus();
+
     // Touch the shell to load persisted settings + apply them to the engine.
     let settings = shell::snapshot();
 
