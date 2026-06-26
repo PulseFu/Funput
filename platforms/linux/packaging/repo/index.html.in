@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<!-- Landing page for the Funput Linux package repository.
+     @REPO_URL@ is substituted by the publish-repo workflow with the Pages base URL. -->
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Funput — kho phần mềm Linux</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfd; --fg: #1d1d1f; --muted: #6e6e73; --card: #fff;
+    --line: #e6e6eb; --code-bg: #f5f5f7; --code-fg: #1d1d1f;
+    --accent: #6d5efc; --ibus: #2f7de1; --fcitx: #8b5cf6;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0c0f; --fg: #f5f5f7; --muted: #9a9aa2; --card: #161619;
+      --line: #2a2a31; --code-bg: #1d1d22; --code-fg: #e8e8ea;
+      --ibus: #5ea0f2; --fcitx: #a78bfa;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
+
+  header { text-align: center; margin-bottom: 2.5rem; }
+  .logo {
+    width: 64px; height: 64px; border-radius: 16px; margin: 0 auto .9rem;
+    background: linear-gradient(135deg, var(--accent), #b06dfc);
+    display: grid; place-items: center; color: #fff; font-size: 30px; font-weight: 700;
+    box-shadow: 0 8px 24px -8px var(--accent);
+  }
+  h1 { font-size: 2rem; margin: 0 0 .3rem; letter-spacing: -.02em; }
+  .lead { color: var(--muted); margin: 0; font-size: 1.05rem; }
+
+  .pick {
+    display: flex; gap: .75rem; flex-wrap: wrap; justify-content: center;
+    margin: 1.6rem 0 2.5rem;
+  }
+  .pick .opt {
+    flex: 1 1 320px; background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 1rem 1.1rem;
+  }
+  .pick .opt b { display: block; margin-bottom: .15rem; }
+  .pick .opt small { color: var(--muted); }
+  .badge {
+    display: inline-block; font-size: .72rem; font-weight: 700; letter-spacing: .03em;
+    text-transform: uppercase; padding: .15rem .5rem; border-radius: 999px;
+    color: #fff; vertical-align: middle;
+  }
+  .badge.ibus  { background: var(--ibus); }
+  .badge.fcitx { background: var(--fcitx); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 1.4rem 1.5rem; margin-bottom: 1.5rem;
+  }
+  .card h2 { margin: 0 0 1rem; font-size: 1.25rem; display: flex; align-items: center; gap: .6rem; }
+  .step { font-size: .82rem; font-weight: 700; color: var(--muted);
+          text-transform: uppercase; letter-spacing: .04em; margin: 1.1rem 0 .45rem; }
+  .step:first-of-type { margin-top: 0; }
+
+  .cmd { position: relative; margin: 0 0 .6rem; }
+  pre {
+    margin: 0; background: var(--code-bg); color: var(--code-fg);
+    padding: .85rem 3.2rem .85rem 1rem; border-radius: 10px; overflow-x: auto;
+    font: 13.5px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .copy {
+    position: absolute; top: .5rem; right: .5rem; border: 1px solid var(--line);
+    background: var(--card); color: var(--muted); font-size: .72rem; font-weight: 600;
+    padding: .25rem .55rem; border-radius: 7px; cursor: pointer; transition: .15s;
+  }
+  .copy:hover { color: var(--fg); border-color: var(--muted); }
+  .copy.done { color: #fff; background: #34a853; border-color: #34a853; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.4rem; }
+  @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
+  .grid .lbl { margin-bottom: .4rem; }
+
+  .note {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 1.1rem 1.3rem; color: var(--muted); font-size: .95rem; margin-top: 2rem;
+  }
+  .note b { color: var(--fg); }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; margin-top: 2rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code.inline { background: var(--code-bg); padding: .1rem .35rem; border-radius: 5px;
+                font: 13px ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">F</div>
+    <h1>Funput</h1>
+    <p class="lead">Bộ gõ tiếng Việt cho Linux — kho cài đặt &amp; cập nhật tự động.</p>
+  </header>
+
+  <div class="pick">
+    <div class="opt">
+      <span class="badge ibus">IBus</span>
+      <b style="margin-top:.4rem">GNOME / Ubuntu mặc định</b>
+      <small>Cài sẵn trên hầu hết desktop. Gói <code class="inline">funput-ibus</code>.</small>
+    </div>
+    <div class="opt">
+      <span class="badge fcitx">Fcitx5</span>
+      <b style="margin-top:.4rem">KDE, hoặc muốn đầy đủ tính năng</b>
+      <small>Per-app auto-switch. Gói <code class="inline">funput</code>.</small>
+    </div>
+  </div>
+
+  <!-- Debian / Ubuntu -->
+  <div class="card">
+    <h2>🐧 Debian / Ubuntu <small style="color:var(--muted);font-weight:400;font-size:.9rem">(.deb)</small></h2>
+
+    <div class="step">1 · Thêm kho (làm một lần)</div>
+    <div class="cmd"><button class="copy">Copy</button><pre><code>sudo install -d /usr/share/keyrings
+curl -fsSL @REPO_URL@funput.asc | sudo tee /usr/share/keyrings/funput.asc >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/funput.asc] @REPO_URL@deb ./" | sudo tee /etc/apt/sources.list.d/funput.list
+sudo apt update</code></pre></div>
+
+    <div class="step">2 · Cài đặt</div>
+    <div class="grid">
+      <div>
+        <div class="lbl"><span class="badge ibus">IBus</span></div>
+        <div class="cmd"><button class="copy">Copy</button><pre><code>sudo apt install funput-ibus</code></pre></div>
+      </div>
+      <div>
+        <div class="lbl"><span class="badge fcitx">Fcitx5</span></div>
+        <div class="cmd"><button class="copy">Copy</button><pre><code>sudo apt install funput</code></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fedora -->
+  <div class="card">
+    <h2>🎩 Fedora <small style="color:var(--muted);font-weight:400;font-size:.9rem">(.rpm)</small></h2>
+
+    <div class="step">1 · Thêm kho (làm một lần)</div>
+    <div class="cmd"><button class="copy">Copy</button><pre><code>sudo dnf config-manager --add-repo @REPO_URL@funput.repo</code></pre></div>
+
+    <div class="step">2 · Cài đặt</div>
+    <div class="grid">
+      <div>
+        <div class="lbl"><span class="badge ibus">IBus</span></div>
+        <div class="cmd"><button class="copy">Copy</button><pre><code>sudo dnf install funput-ibus</code></pre></div>
+      </div>
+      <div>
+        <div class="lbl"><span class="badge fcitx">Fcitx5</span></div>
+        <div class="cmd"><button class="copy">Copy</button><pre><code>sudo dnf install funput</code></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- openSUSE -->
+  <div class="card">
+    <h2>🦎 openSUSE <small style="color:var(--muted);font-weight:400;font-size:.9rem">(.rpm)</small></h2>
+
+    <div class="step">1 · Thêm kho (làm một lần)</div>
+    <div class="cmd"><button class="copy">Copy</button><pre><code>sudo rpm --import @REPO_URL@funput.asc
+sudo zypper addrepo -gf @REPO_URL@rpm/ funput
+sudo zypper refresh</code></pre></div>
+
+    <div class="step">2 · Cài đặt</div>
+    <div class="grid">
+      <div>
+        <div class="lbl"><span class="badge ibus">IBus</span></div>
+        <div class="cmd"><button class="copy">Copy</button><pre><code>sudo zypper install funput-ibus</code></pre></div>
+      </div>
+      <div>
+        <div class="lbl"><span class="badge fcitx">Fcitx5</span></div>
+        <div class="cmd"><button class="copy">Copy</button><pre><code>sudo zypper install funput</code></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arch -->
+  <div class="card">
+    <h2>🏛️ Arch Linux <small style="color:var(--muted);font-weight:400;font-size:.9rem">(AUR)</small></h2>
+    <div class="step">Cài qua AUR helper (vd <code class="inline">yay</code>)</div>
+    <div class="grid">
+      <div>
+        <div class="lbl"><span class="badge ibus">IBus</span></div>
+        <div class="cmd"><button class="copy">Copy</button><pre><code>yay -S funput-ibus</code></pre></div>
+      </div>
+      <div>
+        <div class="lbl"><span class="badge fcitx">Fcitx5</span></div>
+        <div class="cmd"><button class="copy">Copy</button><pre><code>yay -S funput</code></pre></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>Sau khi cài:</b> <span class="badge ibus">IBus</span> chạy <code class="inline">ibus restart</code>
+    rồi <b>Settings → Keyboard → Input Sources → + → Vietnamese → Funput</b>.
+    <span class="badge fcitx">Fcitx5</span> mở <code class="inline">fcitx5-configtool</code> → thêm
+    <b>Funput</b> (nhóm Vietnamese). Mở <b>Funput</b> trong menu ứng dụng để chỉnh Telex/VNI.
+  </div>
+
+  <footer>
+    Khóa ký công khai: <a href="@REPO_URL@funput.asc">funput.asc</a> ·
+    Mã nguồn: <a href="https://github.com/Funput/Funput">github.com/Funput/Funput</a>
+  </footer>
+
+</div>
+
+<script>
+  // Copy-to-clipboard for every command block.
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var code = btn.parentElement.querySelector('code').innerText;
+      navigator.clipboard.writeText(code).then(function () {
+        btn.textContent = '✓ Đã chép';
+        btn.classList.add('done');
+        setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1500);
+      });
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,10 +1,14 @@
 name: Build Linux
 
 # Reusable: builds the shared UI + Settings app + Fcitx5 addon & IBus engine into
-# .debs, natively per arch (no cross-compile) so dpkg-shlibdeps records the right
-# deps. arm64 covers Apple Silicon VMs (Apple Virtualization) and arm servers. Two
-# packages per arch: funput (Fcitx5) and funput-ibus (IBus). Called by release.yml;
-# artifacts (names: linux-<arch>) are picked up by its `publish` job.
+# .debs (Debian/Ubuntu) and .rpms (Fedora/openSUSE), natively per arch (no
+# cross-compile) so the package tool records the right shlib deps. arm64 covers
+# Apple Silicon VMs (Apple Virtualization) and arm servers. Two packages per arch
+# per format: funput (Fcitx5) and funput-ibus (IBus). The `linux` job builds the
+# .debs on Ubuntu; the `linux-rpm` job builds the .rpms in a Fedora container so
+# GNUInstallDirs resolves the rpm-distro libdir (/usr/lib64) and the deps match
+# Fedora package names. Called by release.yml; artifacts (names: linux-<arch> and
+# linux-rpm-<arch>) are picked up by its `publish` job.
 on:
   workflow_call:
     inputs:
@@ -96,4 +100,94 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
+          path: ${{ runner.temp }}/out/*
+
+  # ---- .rpm packages (Fedora container, native per arch) --------------------
+  # Mirrors the `linux` job but on Fedora so the rpm-distro libdir (/usr/lib64),
+  # the Fcitx5/IBus install dirs, and AUTOREQ shlib deps all resolve against
+  # Fedora's layout and package names. Same two packages, .rpm instead of .deb.
+  linux-rpm:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    container: fedora:latest
+    steps:
+      - name: Install build deps
+        run: |
+          # git/tar for actions/checkout; rpm-build so CPack's RPM generator works;
+          # the Fcitx5/IBus/GTK4 -devel packages mirror the apt deps in the `linux`
+          # job. curl (replacing curl-minimal) is for the rustup installer below.
+          dnf install -y --allowerasing --setopt=install_weak_deps=False \
+            git tar gzip which \
+            gcc-c++ cmake make rpm-build pkgconf-pkg-config curl \
+            nlohmann-json-devel \
+            fcitx5-devel \
+            ibus-devel glib2-devel \
+            gtk4-devel libadwaita-devel librsvg2-devel
+
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (rustup, stable)
+        run: |
+          # Pin via rustup rather than Fedora's `rust` package so edition 2024 is
+          # always supported regardless of what `fedora:latest` currently ships.
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Keyed separately from the .deb job (different host/libc) via the suffix.
+          key: rpm-${{ matrix.arch }}
+          workspaces: |
+            . -> target
+            platforms/linux/settings-gtk -> target
+
+      - name: Stamp version from tag
+        if: inputs.version != ''
+        run: |
+          V="${{ inputs.version }}"
+          sed -i -E "0,/^version = \".*\"/s//version = \"$V\"/" platforms/linux/settings-gtk/Cargo.toml
+
+      - name: Build Settings app (GTK4 + libadwaita)
+        working-directory: platforms/linux/settings-gtk
+        run: cargo build --release
+
+      - name: Build addons + .rpms
+        run: |
+          V="${{ inputs.version }}"; V="${V:-1.2026.1}"
+          for fw in fcitx5 ibus; do
+            cmake -S "platforms/linux/$fw" -B "platforms/linux/build/$fw" \
+              -DCMAKE_BUILD_TYPE=Release -DFUNPUT_VERSION="$V"
+            cmake --build "platforms/linux/build/$fw" --parallel
+            ( cd "platforms/linux/build/$fw" && cpack -G RPM )
+          done
+
+      - name: Verify .rpms (rpm can parse them)
+        run: |
+          # Fail fast instead of shipping a broken package: rpm parses the metadata
+          # and we echo the recorded dependencies for the build log.
+          find platforms/linux/build -name '*.rpm' | while read -r f; do
+            echo "== $f =="
+            rpm -qpi "$f" >/dev/null
+            rpm -qp --requires "$f"
+          done
+
+      - name: Stage artifact
+        run: |
+          OUT="$RUNNER_TEMP/out"; mkdir -p "$OUT"
+          find platforms/linux/build -name '*.rpm' | while read -r f; do
+            cp "$f" "$OUT/"
+            sha256sum "$f" | awk '{print $1}' > "$OUT/$(basename "$f").sha256"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-rpm-${{ matrix.arch }}
           path: ${{ runner.temp }}/out/*

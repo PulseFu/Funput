@@ -1,0 +1,169 @@
+name: Publish package repo
+
+# Phase-2 distribution: take the .deb/.rpm assets of the latest release and serve
+# them as GPG-signed apt + dnf repositories on GitHub Pages, so users get
+# `apt/dnf/zypper upgrade` instead of re-downloading. Stateless: each run rebuilds
+# the whole repo from the current release's assets (the newest version is all a
+# package manager needs to offer an upgrade), so no gh-pages history to maintain.
+#
+# Prerequisites (one-time, see platforms/linux/packaging/repo/README.md):
+#   - Settings → Pages → Source = GitHub Actions.
+#   - Secrets GPG_PRIVATE_KEY (ASCII-armored private key) and GPG_PASSPHRASE.
+#     The key's uid must be `Funput <hello@funput.app>` (matches %_gpg_name below).
+on:
+  release:
+    types: [released]   # fires only for full (non-prerelease) releases
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  # Served under the funput.app brand via a GitHub Pages custom domain. The CNAME
+  # file is written into the Pages artifact (deploy job); DNS needs a CNAME record
+  # repo.funput.app -> <owner>.github.io. Override with the REPO_BASE_URL variable
+  # if the domain ever changes (keep the trailing slash).
+  REPO_URL: ${{ vars.REPO_BASE_URL || 'https://repo.funput.app/' }}
+
+jobs:
+  # ---- apt (flat) repo: signed Packages + InRelease -------------------------
+  apt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y apt-utils gnupg jq curl
+
+      - name: Download .deb assets from the release
+        env:
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p tree/deb
+          [ -n "$TAG" ] || TAG="$(curl -fsSL "https://api.github.com/repos/$GH_REPO/releases/latest" | jq -r .tag_name)"
+          curl -fsSL "https://api.github.com/repos/$GH_REPO/releases/tags/$TAG" \
+            | jq -r '.assets[].browser_download_url' | grep '\.deb$' \
+            | while read -r u; do ( cd tree/deb && curl -fsSLO "$u" ); done
+          ls -l tree/deb
+
+      - name: Import GPG key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
+
+      - name: Build + sign flat apt repo
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          cd tree/deb
+          apt-ftparchive packages . > Packages
+          gzip -kf Packages
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin=Funput \
+            -o APT::FTPArchive::Release::Label=Funput \
+            -o APT::FTPArchive::Release::Suite=stable \
+            -o APT::FTPArchive::Release::Codename=stable \
+            -o APT::FTPArchive::Release::Architectures="amd64 arm64" \
+            -o APT::FTPArchive::Release::Components=main \
+            release . > Release
+          GPG=(gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE")
+          "${GPG[@]}" --clearsign -o InRelease Release
+          "${GPG[@]}" -abs -o Release.gpg Release
+          # Public key users import to trust the repo.
+          gpg --armor --export hello@funput.app > funput.asc
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apt-tree
+          path: tree/deb
+
+  # ---- dnf/zypper repo: signed packages + signed repomd ---------------------
+  # Runs in Fedora for native rpmsign + createrepo_c.
+  rpm:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - name: Install tools
+        run: dnf install -y --setopt=install_weak_deps=False createrepo_c rpm-sign gnupg2 jq curl
+
+      - name: Download .rpm assets from the release
+        env:
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p tree/rpm
+          [ -n "$TAG" ] || TAG="$(curl -fsSL "https://api.github.com/repos/$GH_REPO/releases/latest" | jq -r .tag_name)"
+          curl -fsSL "https://api.github.com/repos/$GH_REPO/releases/tags/$TAG" \
+            | jq -r '.assets[].browser_download_url' | grep '\.rpm$' \
+            | while read -r u; do ( cd tree/rpm && curl -fsSLO "$u" ); done
+          ls -l tree/rpm
+
+      - name: Import GPG key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
+
+      - name: Sign packages + build + sign repo
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          # rpmsign drives gpg non-interactively via this macro (loopback passphrase).
+          # Written with printf so the macros start at column 0 (rpm ignores indented
+          # ones — a YAML-block heredoc would prepend the run-step indentation).
+          {
+            echo '%_gpg_name hello@funput.app'
+            echo "%__gpg_sign_cmd %{__gpg} gpg --batch --no-armor --pinentry-mode loopback --passphrase $GPG_PASSPHRASE --no-secmem-warning -u \"%{_gpg_name}\" -sbo %{__signature_filename} %{__plaintext_filename}"
+          } > "$HOME/.rpmmacros"
+          rpm --addsign tree/rpm/*.rpm
+          createrepo_c tree/rpm
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" \
+            --detach-sign --armor tree/rpm/repodata/repomd.xml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpm-tree
+          path: tree/rpm
+
+  # ---- Assemble + deploy to Pages -------------------------------------------
+  deploy:
+    needs: [apt, rpm]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with: { name: apt-tree, path: public/deb }
+      - uses: actions/download-artifact@v4
+        with: { name: rpm-tree, path: public/rpm }
+
+      - name: Assemble site (index, .repo, public key)
+        run: |
+          set -euo pipefail
+          # The public key was exported into the apt tree; surface it at the root.
+          mv public/deb/funput.asc public/funput.asc
+          T=platforms/linux/packaging/repo
+          sed "s#@REPO_URL@#${REPO_URL}#g" "$T/index.html.in"  > public/index.html
+          sed "s#@REPO_URL@#${REPO_URL}#g" "$T/funput.repo.in" > public/funput.repo
+          # Custom domain: derive the host from REPO_URL so it tracks the override.
+          echo "${REPO_URL}" | sed -E 's#^https?://([^/]+)/?.*#\1#' > public/CNAME
+          # Stop Pages' Jekyll from eating dotfiles / repodata dirs.
+          touch public/.nojekyll
+          find public -maxdepth 2 -type f | sort
+
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: public }
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

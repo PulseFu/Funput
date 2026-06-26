@@ -1,0 +1,9 @@
+# dnf/zypper repository for Funput (Vietnamese input method).
+# @REPO_URL@ is substituted by the publish-repo workflow with the Pages base URL.
+[funput]
+name=Funput (Vietnamese input method)
+baseurl=@REPO_URL@rpm/
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=@REPO_URL@funput.asc

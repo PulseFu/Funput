@@ -42,9 +42,25 @@ VI–EN bằng hotkey trong addon cũng ghi ngược lại file để UI phản 
 
 Tray + biểu tượng trạng thái dùng luôn của **Fcitx5** (không dựng tray riêng).
 
+## Cài nhanh (mọi distro)
+
+Script tự nhận distro + kiến trúc, tải đúng gói từ GitHub Release mới nhất rồi cài
+bằng package manager bản địa (apt/dnf/zypper; Arch → hướng dẫn AUR):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Funput/Funput/main/platforms/linux/install.sh | bash
+# Mặc định IBus; phiên KDE Plasma mặc định Fcitx5. Ép tay: thêm --ibus hoặc --fcitx5.
+# Ghim phiên bản: --version v1.2026.1
+```
+
+> Đây là lớp "một lệnh" trên **GitHub Releases**, **chưa** có auto-update (chạy lại
+> script để cập nhật). apt và dnf là hai định dạng repo khác nhau → không repo đơn lẻ
+> nào phục vụ mọi distro; chỉ script detect-rồi-tải mới cho trải nghiệm thống nhất.
+> Auto-update qua apt/dnf repo có ký GPG là bước sau (xem mục cuối).
+
 ## Build từ source
 
-Yêu cầu (Debian/Ubuntu):
+Yêu cầu (Debian/Ubuntu — `.deb`):
 
 ```sh
 sudo apt install \
@@ -56,21 +72,38 @@ sudo apt install \
 # Chỉ dựng một shell? Bỏ qua dev-lib của shell kia (fcitx5* hoặc ibus/libibus*).
 ```
 
-Một lệnh dựng cả hai gói `.deb`:
+Yêu cầu (Fedora/openSUSE — `.rpm`):
+
+```sh
+sudo dnf install \
+  gcc-c++ cmake make rpm-build pkgconf-pkg-config nlohmann-json-devel \
+  fcitx5-devel ibus-devel glib2-devel \
+  gtk4-devel libadwaita-devel librsvg2-devel
+# + Rust (rustup). openSUSE: zypper install với tên gói tương đương.
+```
+
+Một lệnh dựng cả hai gói (định dạng tự chọn theo host: `.deb` nếu có `dpkg`, `.rpm`
+nếu có `rpmbuild`; ép tay bằng `FUNPUT_PKG=deb|rpm`):
 
 ```sh
 platforms/linux/build.sh
 # → cargo build -p funput-ffi  (cdylib)
 # → cargo build (Settings app — GTK4 + libadwaita)
 # → cmake + cpack × {fcitx5, ibus}
-# Kết quả:
+# Kết quả (.deb trên Debian/Ubuntu):
 #   platforms/linux/build/fcitx5/funput_<version>_<arch>.deb
 #   platforms/linux/build/ibus/funput-ibus_<version>_<arch>.deb   (arch = host)
+# (.rpm trên Fedora/openSUSE: funput-<version>.<arch>.rpm / funput-ibus-<version>.<arch>.rpm)
 
 # Chỉ một shell:
 FUNPUT_FRAMEWORK=ibus   platforms/linux/build.sh
 FUNPUT_FRAMEWORK=fcitx5 platforms/linux/build.sh
 ```
+
+> **rpm phải build trên distro rpm**, không sinh từ Ubuntu: libdir (`/usr/lib64`),
+> thư mục addon Fcitx5/IBus và dependency đều phải khớp layout + tên gói Fedora. CI
+> dựng `.rpm` trong container `fedora:latest` (xem `.github/workflows/build-linux.yml`,
+> job `linux-rpm`), build native từng kiến trúc — không cross-compile.
 
 Cài thử: `sudo apt install ./platforms/linux/build/fcitx5/funput_*.deb`
 (hoặc `./platforms/linux/build/ibus/funput-ibus_*.deb`).
@@ -92,7 +125,7 @@ Cài thử: `sudo apt install ./platforms/linux/build/fcitx5/funput_*.deb`
 
 ## Cài & bật — IBus (GNOME)
 
-1. Cài gói: `sudo apt install ./.../ibus/funput-ibus_*.deb`.
+1. Cài gói: `sudo apt install ./.../ibus/funput-ibus_*.deb` (Fedora: `sudo dnf install ./.../funput-ibus-*.rpm`).
 2. Nạp lại engine mới đăng ký: `ibus restart` (hoặc đăng nhập lại).
 3. **Settings → Keyboard → Input Sources → +** → **Vietnamese** → **Funput**.
 4. Chuyển nguồn nhập: **`Super + Space`**. Bật/tắt VI–EN khi đang ở Funput: **`Ctrl + `` `**.
@@ -125,8 +158,15 @@ Mở một app GTK (gedit) và một app Qt:
   cấp id app đang focus đáng tin cậy, nhất là trên Wayland. Fcitx5 vẫn hỗ trợ đầy đủ tính năng này.
   App Settings **ẩn hẳn trang "Ứng dụng bỏ qua" khi đang chạy IBus** (phát hiện qua session D-Bus +
   env IM-module), chỉ hiện khi Fcitx5 là IME đang hoạt động.
-- **Chỉ `.deb`** (chưa rpm/AppImage). Hai gói `funput` (Fcitx5) và `funput-ibus` hiện đóng gói riêng,
-  mỗi gói tự bundle `libfunput_ffi.so` + app Settings (gói chung `funput-common` để sau).
+- **`.deb` (Debian/Ubuntu) + `.rpm` (Fedora/openSUSE); Arch qua AUR.** **AppImage không áp dụng** cho
+  bộ gõ: addon Fcitx5/engine IBus phải cài vào thư mục hệ thống mà daemon quét, còn AppImage mount ở
+  path tạm và không cài gì → daemon không thấy. Hai gói `funput` (Fcitx5) và `funput-ibus` hiện đóng gói
+  riêng, mỗi gói tự bundle `libfunput_ffi.so` + app Settings (gói chung `funput-common` để sau).
+- **Auto-update qua kho apt/dnf có ký GPG** tại `repo.funput.app`: kho tĩnh trên GitHub Pages (custom
+  domain), dựng bởi `.github/workflows/publish-repo.yml` mỗi khi có release chính thức — người dùng
+  `apt/dnf/zypper upgrade` như bình thường. Thiết lập (khóa GPG + secrets + Pages + DNS):
+  [`packaging/repo/README.md`](packaging/repo/README.md). GitHub Release + `install.sh` vẫn là kênh
+  tải trực tiếp song song. Kênh *official* của distro (OBS/COPR/PPA) là bước sau.
 - Hotkey `alt_shift` (combo chỉ-modifier) chưa hỗ trợ; UI Linux chỉ hiện `ctrl_backtick`/`ctrl_space`.
 - Settings **áp dụng tức thì** qua theo dõi file (inotify, `common/settings_watch.*`): Fcitx5 wire fd
   vào event loop riêng, IBus qua `g_unix_fd_add` trên GLib loop; vẫn giữ fallback so mtime lúc focus-in.
