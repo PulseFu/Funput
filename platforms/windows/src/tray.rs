@@ -5,8 +5,8 @@
 //!
 //! This lives on the keyboard-hook thread (the one running a Win32 message loop):
 //! `install()` creates the tray there, and `drain_events()` — called after each
-//! message dispatch — reacts to clicks/menu picks. Opening windows is forwarded to
-//! the Slint main thread via `slint::invoke_from_event_loop`.
+//! message dispatch — reacts to clicks/menu picks. Settings and Onboarding are
+//! launched as short-lived child processes so the tray process stays lightweight.
 
 use std::cell::RefCell;
 
@@ -97,22 +97,29 @@ pub fn drain_events() {
                 set_checks(false, true);
             }
             "settings" => {
-                let _ = slint::invoke_from_event_loop(windows_ui::open_settings);
+                windows_ui::launch_settings(false);
             }
             "guide" => {
-                let _ = slint::invoke_from_event_loop(windows_ui::open_onboarding);
+                windows_ui::launch_onboarding();
             }
             "check-update" => {
-                let _ = slint::invoke_from_event_loop(windows_ui::open_settings_and_check_updates);
+                windows_ui::launch_settings(true);
             }
             "quit" => {
-                let _ = slint::invoke_from_event_loop(|| {
-                    let _ = slint::quit_event_loop();
-                });
+                windows_ui::terminate_children();
+                hook::quit();
             }
             _ => {}
         }
     }
+}
+
+/// Refresh every tray field derived from persisted settings after a Settings child
+/// changed the config file and the background engine reloaded it.
+pub fn sync_from_shell() {
+    let method = shell::method();
+    set_checks(method == InputMethod::Vni, method == InputMethod::Telex);
+    refresh(shell::enabled());
 }
 
 fn refresh(on: bool) {

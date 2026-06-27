@@ -1,13 +1,18 @@
-//! Open the Settings / Onboarding windows on demand (tray-only app otherwise).
-//! Slint windows are created lazily and cached weakly. Closing a window releases
-//! its component tree and renderer resources; reopening creates a fresh instance.
+//! Settings / Onboarding process launcher plus the UI implementation used inside
+//! those short-lived child processes. The background tray process never initializes
+//! Slint, so closing the child lets Windows reclaim the entire UI runtime.
 //!
-//! Everything here runs on the main (Slint event-loop) thread. The tray, which
-//! lives on the hook thread, reaches these via `slint::invoke_from_event_loop`.
+//! Launch functions run on the background hook/tray thread. Window functions run
+//! only in the child process's main Slint event-loop thread.
 
 use std::cell::RefCell;
+use std::process::{Child, Command};
 
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel, Weak};
+use windows::Win32::Foundation::CloseHandle;
+use windows::Win32::System::Threading::{
+    OpenProcess, TerminateProcess, WaitForSingleObject, PROCESS_SYNCHRONIZE, PROCESS_TERMINATE,
+};
 
 use crate::compose::FieldComposer;
 use crate::settings::{Hotkey, Method, ToneStyle};
@@ -16,8 +21,113 @@ use crate::{commands, shell, AppEntry, Compose, OnboardingWindow, SettingsWindow
 thread_local! {
     static SETTINGS: RefCell<Option<Weak<SettingsWindow>>> = const { RefCell::new(None) };
     static ONBOARDING: RefCell<Option<Weak<OnboardingWindow>>> = const { RefCell::new(None) };
+    static UI_PROCESS: RefCell<Option<Child>> = const { RefCell::new(None) };
     /// Vietnamese composer for the gõ tắt expansion field (UI thread only).
     static COMPOSER: RefCell<FieldComposer> = RefCell::new(FieldComposer::new());
+}
+
+const RECENT_APPS_ENV: &str = "FUNPUT_RECENT_APPS";
+const PARENT_PID_ENV: &str = "FUNPUT_PARENT_PID";
+
+// --- child-process lifecycle -----------------------------------------------
+
+/// Launch Settings without loading Slint into the background tray process.
+pub fn launch_settings(check_update: bool) {
+    let arg = if check_update {
+        "--settings-check-update"
+    } else {
+        "--settings"
+    };
+    launch_child(arg);
+}
+
+/// Launch the first-run guide in its own short-lived UI process.
+pub fn launch_onboarding() {
+    launch_child("--onboarding");
+}
+
+fn launch_child(arg: &str) {
+    let already_running = UI_PROCESS.with(|cell| {
+        let mut child = cell.borrow_mut();
+        let running = child
+            .as_mut()
+            .is_some_and(|process| matches!(process.try_wait(), Ok(None)));
+        if !running {
+            *child = None;
+        }
+        running
+    });
+    if already_running {
+        return;
+    }
+
+    let Some(exe) = std::env::current_exe().ok() else {
+        return;
+    };
+    let recent = serde_json::to_string(&shell::recent_apps()).unwrap_or_else(|_| "[]".into());
+    let child = Command::new(exe)
+        .arg(arg)
+        .env(RECENT_APPS_ENV, recent)
+        .env(PARENT_PID_ENV, std::process::id().to_string())
+        .spawn()
+        .ok();
+    UI_PROCESS.with(|cell| *cell.borrow_mut() = child);
+}
+
+/// Close any UI children before the user exits the tray process.
+pub fn terminate_children() {
+    UI_PROCESS.with(|cell| {
+        if let Some(mut child) = cell.borrow_mut().take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    });
+}
+
+/// The updater runs in the Settings child. Stop the old background tray before
+/// spawning the newly installed executable, otherwise two tray processes would
+/// remain active after an update.
+pub fn terminate_parent_for_update() {
+    let Some(pid) = std::env::var(PARENT_PID_ENV)
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+    else {
+        return;
+    };
+    unsafe {
+        let access = PROCESS_TERMINATE | PROCESS_SYNCHRONIZE;
+        if let Ok(process) = OpenProcess(access, false, pid) {
+            let _ = TerminateProcess(process, 0);
+            let _ = WaitForSingleObject(process, 5_000);
+            let _ = CloseHandle(process);
+        }
+    }
+}
+
+fn seed_recent_apps() {
+    let apps = std::env::var(RECENT_APPS_ENV)
+        .ok()
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_default();
+    shell::seed_recent_apps(apps);
+}
+
+/// Entry point for a Settings child process. `run_event_loop` returns when its
+/// only window closes, then normal process teardown releases all Slint resources.
+pub fn run_settings(check_update: bool) {
+    seed_recent_apps();
+    if check_update {
+        open_settings_and_check_updates();
+    } else {
+        open_settings();
+    }
+    let _ = slint::run_event_loop();
+}
+
+/// Entry point for an Onboarding child process.
+pub fn run_onboarding() {
+    open_onboarding();
+    let _ = slint::run_event_loop();
 }
 
 // --- Settings --------------------------------------------------------------
@@ -93,7 +203,10 @@ fn wire_settings(win: &SettingsWindow) {
 
     let w = win.as_weak();
     win.on_add_app(move |id| {
-        if let Some(app) = shell::recent_apps().into_iter().find(|a| a.id == id.as_str()) {
+        if let Some(app) = shell::recent_apps()
+            .into_iter()
+            .find(|a| a.id == id.as_str())
+        {
             commands::add_excluded_app(app);
         }
         if let Some(win) = w.upgrade() {

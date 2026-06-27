@@ -137,6 +137,7 @@ pub fn install_update() {
 /// Relaunch into the freshly installed build (no log-out needed — it is a plain
 /// tray process). Never returns.
 pub fn relaunch_after_update() {
+    windows_ui::terminate_parent_for_update();
     update::relaunch();
 }
 

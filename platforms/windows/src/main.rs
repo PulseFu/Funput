@@ -22,6 +22,30 @@ mod update;
 mod windows_ui;
 
 fn main() {
+    let mode = std::env::args().nth(1);
+
+    // Settings and Onboarding run in short-lived child processes. Keeping Slint
+    // out of the background path lets Windows reclaim the complete UI runtime,
+    // renderer, font caches, and graphics driver allocations when the window closes.
+    match mode.as_deref() {
+        Some("--settings") => {
+            dark_mode::allow_dark_menus();
+            windows_ui::run_settings(false);
+            return;
+        }
+        Some("--settings-check-update") => {
+            dark_mode::allow_dark_menus();
+            windows_ui::run_settings(true);
+            return;
+        }
+        Some("--onboarding") => {
+            dark_mode::allow_dark_menus();
+            windows_ui::run_onboarding();
+            return;
+        }
+        _ => {}
+    }
+
     // Let Windows draw the tray's right-click menu dark when the system is dark.
     // Process-global, so set it before the tray (on the hook thread) is created.
     dark_mode::allow_dark_menus();
@@ -32,18 +56,12 @@ fn main() {
     // Keep the OS autostart entry in sync with the saved preference.
     commands::sync_autostart(settings.launch_at_login);
 
-    // Background engine + tray: install the global keyboard hook (and the tray) on
-    // their own thread with a Win32 message loop.
-    hook::spawn();
-
-    // First run: walk the user through setup. Created before the loop starts; it
-    // shows once `run_event_loop_until_quit` begins pumping.
+    // First run: launch the short-lived Onboarding UI process.
     if !settings.has_completed_onboarding {
-        windows_ui::open_onboarding();
+        windows_ui::launch_onboarding();
     }
 
-    // Tray-only app: the loop keeps running with no window open, until the tray's
-    // "Thoát" calls `quit_event_loop`.
-    slint::run_event_loop_until_quit().expect("Slint event loop failed");
-    std::process::exit(0);
+    // The background process never initializes Slint. Its main thread is the Win32
+    // message loop that owns the keyboard hook and tray icon.
+    hook::run();
 }

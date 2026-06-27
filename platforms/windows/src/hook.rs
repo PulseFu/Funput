@@ -1,8 +1,9 @@
 //! The global low-level keyboard hook: intercepts keys, drives the engine, and
-//! injects composed text. Runs on its own thread with a message loop (required for
-//! `WH_KEYBOARD_LL`). The hook callback is a bare C function, so it reaches the
-//! engine through [`crate::shell`]'s process-global state.
+//! injects composed text. Runs on the background process's main thread with a
+//! message loop (required for `WH_KEYBOARD_LL`). The hook callback is a bare C
+//! function, so it reaches the engine through [`crate::shell`]'s process-global state.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 
 use funput_desktop::{classify, plan_inject, KeyKind};
@@ -10,13 +11,12 @@ use windows::core::PWSTR;
 use windows::Win32::Foundation::{CloseHandle, HINSTANCE, HMODULE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::{
-    GetCurrentProcessId, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
-    PROCESS_QUERY_LIMITED_INFORMATION,
+    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, DispatchMessageW, GetForegroundWindow, GetMessageW, GetWindowThreadProcessId,
+    CallNextHookEx, DispatchMessageW, GetMessageW, GetWindowThreadProcessId, PostQuitMessage,
     SetWindowsHookExW, TranslateMessage, EVENT_SYSTEM_FOREGROUND, HC_ACTION, KBDLLHOOKSTRUCT, MSG,
     WH_KEYBOARD_LL, WINEVENT_OUTOFCONTEXT, WM_KEYDOWN, WM_SYSKEYDOWN,
 };
@@ -26,14 +26,17 @@ use crate::{inject, keymap, shell, tray};
 /// Called after a Ctrl+` toggle so the tray can refresh its checkmark/icon.
 type ToggleCb = Box<dyn Fn(bool) + Send + Sync>;
 static ON_TOGGLE: OnceLock<ToggleCb> = OnceLock::new();
+static FOREGROUND_IS_FUNPUT: AtomicBool = AtomicBool::new(false);
+static OWN_EXE_ID: OnceLock<String> = OnceLock::new();
 
 pub fn set_on_toggle(f: impl Fn(bool) + Send + Sync + 'static) {
     let _ = ON_TOGGLE.set(Box::new(f));
 }
 
-/// Install the hook on a dedicated thread with its own message pump.
-pub fn spawn() {
-    std::thread::spawn(|| unsafe {
+/// Install the hook and tray on the current thread, then run their Win32 message
+/// pump until the tray's Quit command posts `WM_QUIT`.
+pub fn run() {
+    unsafe {
         let hmod = GetModuleHandleW(None).unwrap_or_default();
         let hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), HINSTANCE(hmod.0), 0);
         if hook.is_err() {
@@ -65,7 +68,12 @@ pub fn spawn() {
             DispatchMessageW(&msg);
             tray::drain_events();
         }
-    });
+    }
+}
+
+/// Stop the background message loop. Called on the hook/tray thread.
+pub fn quit() {
+    unsafe { PostQuitMessage(0) };
 }
 
 /// Foreground-window changed: record the app and apply its per-app VI/EN default.
@@ -84,12 +92,32 @@ unsafe extern "system" fn win_event_proc(
     let Some((id, name)) = exe_of_window(hwnd) else {
         return;
     };
+    let is_funput = id == own_exe_id().as_str();
+    FOREGROUND_IS_FUNPUT.store(is_funput, Ordering::Relaxed);
+    if is_funput {
+        return;
+    }
+
+    // A Settings child persists changes to disk. Reload them as soon as focus
+    // returns to a regular app, before the next keystroke reaches the engine.
+    if shell::reload_settings() {
+        tray::sync_from_shell();
+    }
     shell::note_foreground(id.clone(), name);
     if let Some(on) = shell::apply_for_app(&id) {
         if let Some(cb) = ON_TOGGLE.get() {
             cb(on); // keep tray checkmark / tooltip in sync with the auto-switch
         }
     }
+}
+
+fn own_exe_id() -> &'static String {
+    OWN_EXE_ID.get_or_init(|| {
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_lowercase()))
+            .unwrap_or_else(|| "funput.exe".to_string())
+    })
 }
 
 /// Resolve a window's owning process to `(id, name)` where `id` is the lowercased
@@ -107,7 +135,12 @@ unsafe fn exe_of_window(hwnd: HWND) -> Option<(String, String)> {
 
     let mut buf = [0u16; 260];
     let mut len = buf.len() as u32;
-    let res = QueryFullProcessImageNameW(handle, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len);
+    let res = QueryFullProcessImageNameW(
+        handle,
+        PROCESS_NAME_WIN32,
+        PWSTR(buf.as_mut_ptr()),
+        &mut len,
+    );
     let _ = CloseHandle(handle);
     res.ok()?;
 
@@ -119,23 +152,6 @@ unsafe fn exe_of_window(hwnd: HWND) -> Option<(String, String)> {
     let id = file.to_lowercase();
     let name = id.strip_suffix(".exe").unwrap_or(&id).to_string();
     Some((id, name))
-}
-
-/// The foreground window when it belongs to **our own** process (the Slint Settings
-/// UI), else `None`. Used to route composition through PostMessage instead of the
-/// SendInput path winit ignores.
-unsafe fn own_foreground_window() -> Option<HWND> {
-    let hwnd = GetForegroundWindow();
-    if hwnd.0.is_null() {
-        return None;
-    }
-    let mut pid = 0u32;
-    GetWindowThreadProcessId(hwnd, Some(&mut pid));
-    if pid != 0 && pid == GetCurrentProcessId() {
-        Some(hwnd)
-    } else {
-        None
-    }
 }
 
 unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -171,11 +187,9 @@ fn handle_keydown(kbd: &KBDLLHOOKSTRUCT) -> bool {
         return false; // English mode: hands off
     }
 
-    // Funput's own Settings window (Slint). The global SendInput path can't compose
-    // into it (winit ignores synthetic input), so the window composes Vietnamese
-    // in-process via the engine (see `windows_ui`/Slint `TextInput`). The hook stays
-    // out of it entirely — keys pass through to Slint untouched.
-    if unsafe { own_foreground_window() }.is_some() {
+    // Settings/Onboarding run in a separate Funput process. Their fields compose
+    // in-process, so the background hook must leave their keystrokes untouched.
+    if FOREGROUND_IS_FUNPUT.load(Ordering::Relaxed) {
         return false;
     }
 

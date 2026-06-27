@@ -129,7 +129,32 @@ pub fn method_and_tone() -> (InputMethod, CoreToneStyle) {
 /// Canary also report `chrome.exe`; Edge (`msedge.exe`) and Brave (`brave.exe`)
 /// deliberately do not match — they are unaffected.
 pub fn foreground_is_chrome() -> bool {
-    with(|s| s.recent.first().map(|a| a.id == "chrome.exe").unwrap_or(false))
+    with(|s| {
+        s.recent
+            .first()
+            .map(|a| a.id == "chrome.exe")
+            .unwrap_or(false)
+    })
+}
+
+/// Reload settings written by the separate Settings process. Runtime-only recent
+/// apps and per-app overrides stay in the background process; only persisted state
+/// and the live composition engine are refreshed.
+pub fn reload_settings() -> bool {
+    let loaded = Settings::load();
+    with(|s| {
+        if s.settings == loaded {
+            return false;
+        }
+        apply_to_engine(&mut s.engine, &loaded);
+        s.settings = loaded;
+        true
+    })
+}
+
+/// Seed a Settings child with the background process's runtime-only recent-app list.
+pub fn seed_recent_apps(apps: Vec<ExcludedApp>) {
+    with(|s| s.recent = apps);
 }
 
 // --- writes (each persists) ------------------------------------------------
