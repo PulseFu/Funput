@@ -229,6 +229,15 @@ mod tests {
         assert_eq!(engine.buffer(), "");
     }
 
+    /// Footprint headline for benchmarks: the engine's stack size stays tiny (run
+    /// `cargo test -p funput-engine -- --nocapture engine_struct_size` to print it).
+    #[test]
+    fn engine_struct_size() {
+        let bytes = std::mem::size_of::<Engine>();
+        println!("size_of::<Engine>() = {bytes} bytes");
+        assert!(bytes < 1024, "engine struct unexpectedly large: {bytes} bytes");
+    }
+
     #[test]
     fn set_method_vni() {
         let mut engine = Engine::new();

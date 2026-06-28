@@ -12,3 +12,4 @@ path = "src/main.rs"
 funput-core = { path = "../funput-core" }
 funput-engine = { path = "../funput-engine" }
 clap = { version = "4", features = ["derive"] }
+unicode-normalization = "0.1.25"

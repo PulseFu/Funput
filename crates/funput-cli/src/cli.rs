@@ -1,5 +1,7 @@
 //! Command-line surface (clap derive).
 
+use std::path::PathBuf;
+
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::sim::Method;
@@ -24,6 +26,20 @@ pub enum Command {
     Repl {
         #[command(flatten)]
         opts: CommonOpts,
+    },
+    /// Round-trip coverage check over a Vietnamese corpus (Telex & VNI).
+    Coverage {
+        /// Corpus file (one word per line). Defaults to `benchmarks/sample.txt`.
+        corpus: Option<PathBuf>,
+        /// Emit machine-readable JSON instead of a human report.
+        #[arg(long)]
+        json: bool,
+        /// Print up to N sample mismatches per method.
+        #[arg(long, default_value_t = 0)]
+        show_mismatches: usize,
+        /// Cap the number of syllables evaluated (for a quick run).
+        #[arg(long)]
+        limit: Option<usize>,
     },
 }
 

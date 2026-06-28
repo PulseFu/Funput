@@ -6,3 +6,10 @@ license.workspace = true
 
 [dependencies]
 funput-core = { path = "../funput-core" }
+
+[dev-dependencies]
+criterion = "0.8.2"
+
+[[bench]]
+name = "process_char"
+harness = false
