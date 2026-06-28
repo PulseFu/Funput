@@ -5,3 +5,10 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+
+[dev-dependencies]
+criterion = { version = "0.8", features = ["html_reports"] }
+
+[[bench]]
+name = "apply"
+harness = false

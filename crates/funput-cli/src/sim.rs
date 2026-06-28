@@ -5,7 +5,7 @@
 //! [`ImeResult`](funput_engine::ImeResult) to the app's text — so the CLI acts
 //! as a minimal, scriptable "platform" with no input hooks.
 
-use funput_core::InputMethod;
+use funput_core::{InputMethod, ToneStyle};
 use funput_engine::{Action, Engine};
 
 /// Input method selectable on the command line.
@@ -45,9 +45,39 @@ pub struct Simulation {
 
 /// Run `input` through a fresh engine, acting as the platform: apply each
 /// `ImeResult` to an app-text model exactly like a real shell would.
+/// Engine configuration for a simulation run. Mirrors the toggles a platform shell
+/// would push to the engine.
+#[derive(Debug, Clone, Copy)]
+pub struct SimConfig {
+    pub method: Method,
+    pub tone_style: ToneStyle,
+    pub smart_restore: bool,
+    pub spell_check: bool,
+}
+
+impl SimConfig {
+    /// Defaults matching a fresh engine (smart restore on, spell-check off).
+    pub fn new(method: Method) -> Self {
+        Self {
+            method,
+            tone_style: ToneStyle::Traditional,
+            smart_restore: true,
+            spell_check: false,
+        }
+    }
+}
+
 pub fn simulate(method: Method, input: &str) -> Simulation {
+    simulate_with(SimConfig::new(method), input)
+}
+
+/// Like [`simulate`], but with explicit engine configuration.
+pub fn simulate_with(config: SimConfig, input: &str) -> Simulation {
     let mut engine = Engine::new();
-    engine.set_method(method.to_core());
+    engine.set_method(config.method.to_core());
+    engine.set_tone_style(config.tone_style);
+    engine.set_smart_restore(config.smart_restore);
+    engine.set_spell_check(config.spell_check);
 
     let mut app_text = String::new();
     let mut steps = Vec::new();

@@ -5,9 +5,13 @@
 //! for quick checks, debugging, and CI.
 
 mod cli;
+mod coverage;
+mod encode;
 mod render;
 mod repl;
 mod sim;
+
+use std::path::PathBuf;
 
 use clap::Parser;
 
@@ -25,5 +29,17 @@ fn main() {
             }
         }
         Command::Repl { opts } => repl::run(opts.method.into(), opts.steps),
+        Command::Coverage {
+            corpus,
+            json,
+            show_mismatches,
+            limit,
+        } => {
+            let path = corpus.unwrap_or_else(|| PathBuf::from("benchmarks/sample.txt"));
+            if let Err(e) = coverage::run(&path, json, show_mismatches, limit) {
+                eprintln!("coverage: cannot read corpus {}: {e}", path.display());
+                std::process::exit(1);
+            }
+        }
     }
 }
