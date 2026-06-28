@@ -50,8 +50,11 @@ fn violates_ckg_spelling(onset: &str, nucleus: &str) -> bool {
 
     match onset.to_lowercase().as_str() {
         "c" => !matches!(stem, 'a' | 'ă' | 'â' | 'o' | 'ô' | 'ơ' | 'u' | 'ư'),
-        // `k` precedes the front vowels e, ê, i, y (kẻ, kê, kim, kỳ/ký/kỹ).
-        "k" => !matches!(stem, 'e' | 'ê' | 'i' | 'y'),
+        // Native `k` precedes only front vowels (kẻ, kê, kim, kỳ), but loanwords and
+        // toponyms break this freely — `Kông` (Hồng Kông), `Kenya`, `Kang` — and a
+        // back-vowel `k` is distinct enough from English that allowing it costs little.
+        // So `k` is exempt from the pairing rule (the rhyme check still applies).
+        "k" => false,
         // `g` + `i` is the valid `gi` digraph (gì, gìn); `g` + e/ê uses `gh`.
         "g" => !matches!(stem, 'a' | 'ă' | 'â' | 'o' | 'ô' | 'ơ' | 'u' | 'ư' | 'i'),
         "gh" => !matches!(stem, 'e' | 'ê' | 'i'),
@@ -117,6 +120,20 @@ pub fn is_valid(buffer: &str) -> bool {
     matches!(validate_modifier(buffer), ModifierValidation::Allow)
 }
 
+/// Central Highlands (Tây Nguyên) toponyms borrowed from Ê Đê / Jarai / Bahnar /
+/// M'Nông write the final /k/ stop as `k` (`Đắk`, `Lắk`, `Plắk`), which is
+/// allophonic with Vietnamese final `c`. Treat a lone trailing `k` as `c` for
+/// validation so these names pass without broadening the general coda inventory
+/// (which would wrongly accept English `book`, `look`, …). A multi-letter coda
+/// (`ck`) is left untouched, so `rock`/`back` are unaffected.
+fn normalize_ethnic_coda(coda: &str) -> &str {
+    if coda.eq_ignore_ascii_case("k") {
+        "c"
+    } else {
+        coda
+    }
+}
+
 /// Returns true if `buffer` is a *complete* valid Vietnamese syllable.
 ///
 /// **Strict**: the coda must be a real Vietnamese final (`c ch m n ng nh p t`),
@@ -126,25 +143,26 @@ pub fn is_valid(buffer: &str) -> bool {
 /// `côl` (cool), `tẽt` (text).
 pub fn is_complete_syllable(buffer: &str) -> bool {
     let parts = parse_syllable(buffer);
+    let coda = normalize_ethnic_coda(&parts.coda);
 
     let structure_ok = !parts.invalid_onset
         && (parts.onset.is_empty() || is_valid_onset(&parts.onset.to_lowercase()))
         && !parts.nucleus.is_empty()
         && !violates_ckg_spelling(&parts.onset, &parts.nucleus)
-        && VALID_CODAS.contains(&parts.coda.to_lowercase().as_str());
+        && VALID_CODAS.contains(&coda.to_lowercase().as_str());
     if !structure_ok {
         return false;
     }
 
     // The nucleus+coda must be a real Vietnamese rhyme (Level 2): keeps `việt`,
     // `trường` … but reverts structurally-ok-but-nonexistent rhymes.
-    if !is_valid_rhyme(&toneless_rhyme(&parts.nucleus, &parts.coda)) {
+    if !is_valid_rhyme(&toneless_rhyme(&parts.nucleus, coda)) {
         return false;
     }
 
     // Phonotactics: a stop coda only allows sắc / nặng. Flags `tẽt` (English
     // "text"), `bèct`, etc. as not-a-syllable so the engine restores the raw word.
-    if STOP_CODAS.contains(&parts.coda.to_lowercase().as_str()) {
+    if STOP_CODAS.contains(&coda.to_lowercase().as_str()) {
         return matches!(nucleus_tone(&parts.nucleus), Some(Tone::Sac | Tone::Nang));
     }
 
@@ -186,7 +204,8 @@ pub fn is_definitely_invalid(buffer: &str) -> bool {
         return false; // still building the onset
     }
 
-    let rhyme_query = format!("{}{}", deshape(&parts.nucleus), deshape(&parts.coda));
+    let coda = normalize_ethnic_coda(&parts.coda);
+    let rhyme_query = format!("{}{}", deshape(&parts.nucleus), deshape(coda));
     let reachable = rhyme::all()
         .iter()
         .any(|r| deshape(r).starts_with(&rhyme_query));
@@ -194,7 +213,7 @@ pub fn is_definitely_invalid(buffer: &str) -> bool {
         return true;
     }
 
-    if STOP_CODAS.contains(&parts.coda.to_lowercase().as_str()) {
+    if STOP_CODAS.contains(&coda.to_lowercase().as_str()) {
         return matches!(
             nucleus_tone(&parts.nucleus),
             Some(Tone::Huyen | Tone::Hoi | Tone::Nga)
@@ -322,9 +341,13 @@ mod tests {
     #[test]
     fn ckg_spelling() {
         assert_eq!(validate_tone("ke"), ModifierValidation::Allow);
-        assert_eq!(validate_tone("ka"), ModifierValidation::PassThrough);
+        // `k` is exempt from the pairing rule for loanwords/toponyms (Kông, Kenya).
+        assert_eq!(validate_tone("ka"), ModifierValidation::Allow);
         assert_eq!(validate_tone("ca"), ModifierValidation::Allow);
-        // `gi` digraph stays valid, `ge` would need `gh`.
+        // `c`+front still needs `k`; `ge` would need `gh` — these stay restricted.
+        assert_eq!(validate_tone("ce"), ModifierValidation::PassThrough);
+        assert_eq!(validate_tone("ge"), ModifierValidation::PassThrough);
+        // `gi` digraph stays valid.
         assert_eq!(validate_tone("gi"), ModifierValidation::Allow);
     }
 }

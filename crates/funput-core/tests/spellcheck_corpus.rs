@@ -65,8 +65,61 @@ fn spell_check_keeps_real_words() {
         ("huychs", "huých"),
         ("gieengs", "giếng"),
         ("nghieeng", "nghiêng"),
+        // "Hồng Kông" — k+ô loanword composes end-to-end with the gate on.
+        ("hoongf", "hồng"),
+        ("koong", "kông"),
+        ("drawng", "drăng"), // cluster onset dr (Ea Drăng)
     ] {
         assert_eq!(type_checked(keys), expected, "blocked real word: {keys}");
+    }
+}
+
+/// Central Highlands (Tây Nguyên) toponyms with non-native structure: cluster
+/// onsets (`kr`, `pl`, `dr`, `gl`) and the final `k` allophone of `c`. These must
+/// be accepted so spell-check / auto-restore never destroys real place names.
+#[test]
+fn tay_nguyen_place_names_accepted() {
+    for &s in &[
+        "đắk",   // Đắk Lắk / Đắk Nông — final k ≈ c, sắc
+        "lắk",   // Đắk Lắk
+        "plắk",  // cluster onset pl + final k
+        "krông", // cluster onset kr (Krông Pa, Krông Nô)
+        "drăng", // cluster onset dr (Ea Drăng)
+        "glong", // cluster onset gl (Đắk Glong)
+        "chư",   // Chư Pưh / Chư Sê
+        "kông",  // k + ô — loanword/toponym (Hồng Kông, Kông Chro)
+        "pơng",  // ơng rhyme (Chư Pơng)
+    ] {
+        assert!(is_complete_syllable(s), "Tây Nguyên name wrongly rejected: {s}");
+    }
+}
+
+/// Common loanword place names that also break native phonotactics.
+#[test]
+fn loanword_place_names_accepted() {
+    // "Hồng Kông": both syllables must hold up (hồng is native; kông is k+ô).
+    assert!(is_complete_syllable("hồng"));
+    assert!(is_complete_syllable("kông"));
+    // Kenya / Canada-style k+front already worked; keep as guard.
+    assert!(is_complete_syllable("kê"));
+}
+
+/// Boundary of the chosen scope. `Blơr` needs a final `r`, which we deliberately do
+/// NOT add: `r` is the Telex hỏi-tone key (so it can't be a coda there) and a global
+/// `r` coda would wrongly keep English `car`/`bar`. Documented as unsupported — it
+/// falls back to the English toggle / VNI.
+#[test]
+fn tay_nguyen_out_of_scope_still_rejected() {
+    assert!(!is_complete_syllable("blơr"), "final r not in scope");
+}
+
+/// The k≈c allophone must NOT over-accept English: a lone trailing `k` only maps to
+/// `c`, and the stop-coda tone rule still applies, so `book`/`look` (no sắc/nặng)
+/// and `rock` (coda `ck`) stay rejected.
+#[test]
+fn final_k_does_not_overaccept_english() {
+    for &s in &["book", "look", "rock", "tank"] {
+        assert!(!is_complete_syllable(s), "English word wrongly accepted: {s}");
     }
 }
 

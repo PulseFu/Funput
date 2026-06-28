@@ -31,7 +31,7 @@ const VALID_RHYMES: &[&str] = &[
     "oat", "oăt", "oet", "uât", "uyêt", "yt", "uyt",
     // -ng
     "ang", "ăng", "âng", "eng", "ong", "ông", "ung", "ưng", "iêng", "uông", "ương", "oang", "oăng",
-    "uâng", "oong", "êng", "yêng",
+    "uâng", "oong", "êng", "yêng", "ơng",
     // -c
     "ac", "ăc", "âc", "oc", "ôc", "uc", "ưc", "iêc", "uôc", "ươc", "oac", "oăc", "ec", "ooc",
     // -nh
