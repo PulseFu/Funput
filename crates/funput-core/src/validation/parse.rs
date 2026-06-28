@@ -17,9 +17,20 @@ const VALID_ONSETS: &[&str] = &[
     "p", "ph", "qu", "r", "s", "t", "th", "tr", "v", "x",
 ];
 
-/// True if `onset_lower` is a valid Vietnamese onset (`đ` included).
+/// Consonant-cluster onsets that occur only in Central Highlands (Tây Nguyên)
+/// toponyms borrowed from Ê Đê / Jarai / Bahnar / M'Nông (`Pleiku`, `Krông`,
+/// `Glong`, `Blơr`, `Drăng`). Not native Vietnamese onsets — kept separate so the
+/// inventory above stays "pure Vietnamese". A valid rhyme is still required after
+/// the onset, so this barely affects English auto-restore.
+const ETHNIC_ONSETS: &[&str] = &["bl", "br", "dr", "gl", "gr", "kl", "kr", "pl", "pr"];
+
+/// True if `onset_lower` is a valid Vietnamese onset (`đ` included), or a Tây
+/// Nguyên toponym cluster ([`ETHNIC_ONSETS`]).
 pub(crate) fn is_valid_onset(onset_lower: &str) -> bool {
-    onset_lower.is_empty() || onset_lower == "đ" || VALID_ONSETS.contains(&onset_lower)
+    onset_lower.is_empty()
+        || onset_lower == "đ"
+        || VALID_ONSETS.contains(&onset_lower)
+        || ETHNIC_ONSETS.contains(&onset_lower)
 }
 
 /// Parse one syllable chunk into onset, vowel nucleus, and coda.

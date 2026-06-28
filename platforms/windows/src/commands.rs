@@ -24,6 +24,10 @@ pub fn set_eager_restore(on: bool) {
     shell::set_eager_restore(on);
 }
 
+pub fn set_spell_check(on: bool) {
+    shell::set_spell_check(on);
+}
+
 pub fn set_toggle_hotkey(hotkey: Hotkey) {
     shell::set_toggle_hotkey(hotkey);
 }

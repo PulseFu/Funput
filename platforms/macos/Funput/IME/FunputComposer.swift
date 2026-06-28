@@ -39,6 +39,12 @@ final class FunputComposer {
         funput_set_eager_restore(handle, on)
     }
 
+    /// Spell-check ("Kiểm tra chính tả"): only place a diacritic when it forms a
+    /// valid Vietnamese syllable, otherwise keep the modifier key literal.
+    func setSpellCheck(_ on: Bool) {
+        funput_set_spell_check(handle, on)
+    }
+
     func clear() {
         funput_clear(handle)
     }

@@ -29,6 +29,16 @@ struct SmartPane: View {
                             .toggleStyle(.switch)
                             .disabled(!settings.smartEnglishRestore)
                     }
+                    Divider()
+                    SettingsRow(
+                        title: "Kiểm tra chính tả",
+                        subtitle: "Chỉ đặt dấu khi tạo thành âm tiết tiếng Việt hợp lệ",
+                        systemImage: "checkmark.seal"
+                    ) {
+                        Toggle("", isOn: $settings.spellCheckEnabled)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                    }
                 }
             }
 
@@ -38,6 +48,7 @@ struct SmartPane: View {
                     exampleRow("text", "text", "không phải tiếng Việt → giữ")
                     exampleRow("phus", "phú", "âm tiết hợp lệ → có dấu")
                     exampleRow("mixx", "mix", "gõ đúp dấu để ra tiếng Anh")
+                    exampleRow("tetf", "tetf", "kiểm tra chính tả → không đặt dấu sai")
                 }
             }
         }

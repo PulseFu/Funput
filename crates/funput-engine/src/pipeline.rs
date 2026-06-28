@@ -1,6 +1,6 @@
 //! Key → funput-core → ImeResult orchestration.
 
-use funput_core::{apply, is_definitely_invalid, TransformKind};
+use funput_core::{apply_checked, is_definitely_invalid, TransformKind};
 
 use crate::diff::diff;
 use crate::result::ImeResult;
@@ -10,7 +10,13 @@ use crate::session::Session;
 ///
 /// `session.keys` already includes `key` (pushed by the caller).
 pub(crate) fn process(session: &mut Session, key: char) -> ImeResult {
-    let result = apply(&session.buffer, key, session.method, session.tone_style);
+    let result = apply_checked(
+        &session.buffer,
+        key,
+        session.method,
+        session.tone_style,
+        session.spell_check,
+    );
 
     // Buffer after composing this key (the engine appends literally on Ignored).
     let composed = match result.kind {

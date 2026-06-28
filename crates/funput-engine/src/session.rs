@@ -23,6 +23,10 @@ pub(crate) struct Session {
     /// Restore the instant a word becomes a dead end, without waiting for a word
     /// boundary. Only meaningful while `smart_restore` is on.
     pub(crate) eager_restore: bool,
+    /// Spell-check ("Kiểm tra chính tả"): only place a diacritic when the result can
+    /// still become a real Vietnamese syllable, otherwise keep the modifier key as a
+    /// literal (UniKey-style strict diacritics). Off by default.
+    pub(crate) spell_check: bool,
     /// Text-expansion table (gõ tắt): raw-keystroke trigger → expansion. Matched
     /// case-sensitively against `keys` at a word boundary, before English restore.
     /// Config that lives for the whole session — `clear()` does not touch it.
@@ -39,6 +43,7 @@ impl Session {
             keys: String::new(),
             smart_restore: true,
             eager_restore: true,
+            spell_check: false,
             shortcuts: HashMap::new(),
         }
     }

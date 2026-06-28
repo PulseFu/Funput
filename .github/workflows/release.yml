@@ -112,24 +112,14 @@ jobs:
           {
             echo "## Funput v${{ needs.version.outputs.version }}"
             echo
-            echo "### macOS"
-            echo "- \`Funput-*.pkg\` — **cách thường (có quyền admin):** double-click để cài (mở Installer.app), nhập mật khẩu. Đã ký Developer ID Installer + notarized, không bị Gatekeeper chặn."
-            echo "- \`Funput-*.app.zip\` — **không có quyền admin:** giải nén, rồi kéo \`Funput.app\` vào \`~/Library/Input Methods\` (Finder → \`Cmd+Shift+G\` → gõ đường dẫn đó, tạo nếu chưa có). App đã notarized nên không bị chặn; không cần admin."
-            echo "  Sau khi cài (cả hai cách): **System Settings → Keyboard → Input Sources → + → Vietnamese → Funput**. Chưa thấy thì log out/in một lần."
-            echo "### Windows"
-            echo "- \`Funput-*.exe\` — portable, double-click là chạy (nằm ở khay hệ thống). Tự cập nhật trong app (Cài đặt → Giới thiệu → Kiểm tra cập nhật…)."
-            echo "### Linux"
-            echo "Chọn gói theo (1) distro — \`.deb\` cho Debian/Ubuntu, \`.rpm\` cho Fedora/openSUSE — và (2) input framework của desktop. Chọn đúng kiến trúc: \`.deb\` dùng \`amd64\`/\`arm64\` (xem \`dpkg --print-architecture\`), \`.rpm\` dùng \`x86_64\`/\`aarch64\` (xem \`uname -m\`)."
+            echo "📖 **Hướng dẫn cài đặt & kích hoạt cho từng nền tảng:** https://docs.funput.app/docs/install/"
             echo
-            echo "**Debian / Ubuntu (.deb):**"
-            echo "- **GNOME / Ubuntu mặc định (IBus):** \`sudo apt install ./funput-ibus_*_<arch>.deb\`, rồi \`ibus restart\`."
-            echo "- **KDE, hoặc muốn đầy đủ (per-app auto-switch) (Fcitx5):** \`sudo apt install ./funput_*_<arch>.deb\` (cần Fcitx5), rồi \`fcitx5-configtool\` → thêm **Funput**."
+            echo "### Tải về"
+            echo "- **macOS:** \`Funput-*.pkg\` (có quyền admin) hoặc \`Funput-*.app.zip\` (không cần admin)."
+            echo "- **Windows:** \`Funput-*.exe\` — portable, chạy ngay, tự cập nhật trong app."
+            echo "- **Linux:** \`.deb\` (Debian/Ubuntu) hoặc \`.rpm\` (Fedora/openSUSE); mỗi loại có bản **IBus** (\`funput-ibus-*\`) và **Fcitx5** (\`funput-*\`). Chọn đúng kiến trúc CPU."
             echo
-            echo "**Fedora / openSUSE (.rpm):**"
-            echo "- **GNOME mặc định (IBus):** \`sudo dnf install ./funput-ibus-*.<arch>.rpm\`, rồi \`ibus restart\`. (openSUSE: \`sudo zypper install\`.)"
-            echo "- **KDE / Fcitx5:** \`sudo dnf install ./funput-*.<arch>.rpm\` (cần Fcitx5), rồi \`fcitx5-configtool\` → thêm **Funput**."
-            echo
-            echo "Sau khi cài (mọi distro): **Settings → Keyboard → Input Sources → + → Vietnamese → Funput**. Mở **Funput** trong menu ứng dụng để chỉnh Telex/VNI."
+            echo "Các bước cài đặt, kích hoạt và chọn Telex/VNI: xem https://docs.funput.app/docs/install/"
             echo
             echo "### SHA-256"
             for f in out/*.sha256; do

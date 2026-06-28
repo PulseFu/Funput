@@ -46,6 +46,11 @@ final class AppSettings {
     var eagerRestore: Bool {
         didSet { defaults.set(eagerRestore, forKey: Keys.eagerRestore) }
     }
+    /// Spell-check ("Kiểm tra chính tả"): only place a diacritic when it forms a valid
+    /// Vietnamese syllable, otherwise keep the modifier key literal. Off by default.
+    var spellCheckEnabled: Bool {
+        didSet { defaults.set(spellCheckEnabled, forKey: Keys.spellCheckEnabled) }
+    }
     var toggleShortcut: ToggleShortcut {
         didSet { defaults.set(toggleShortcut.rawValue, forKey: Keys.toggleShortcut) }
     }
@@ -90,6 +95,7 @@ final class AppSettings {
         vietnameseEnabled = defaults.bool(forKey: Keys.vietnameseEnabled)
         smartEnglishRestore = defaults.bool(forKey: Keys.smartEnglishRestore)
         eagerRestore = defaults.bool(forKey: Keys.eagerRestore)
+        spellCheckEnabled = defaults.bool(forKey: Keys.spellCheckEnabled)
         toggleShortcut = defaults.string(forKey: Keys.toggleShortcut)
             .flatMap(ToggleShortcut.init(rawValue:)) ?? .controlBackslash
         launchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
@@ -138,6 +144,7 @@ final class AppSettings {
         static let vietnameseEnabled = "vietnameseEnabled"
         static let smartEnglishRestore = "smartEnglishRestore"
         static let eagerRestore = "eagerRestore"
+        static let spellCheckEnabled = "spellCheckEnabled"
         static let toggleShortcut = "toggleShortcut"
         static let launchAtLogin = "launchAtLogin"
         static let showMenuBarIcon = "showMenuBarIcon"
