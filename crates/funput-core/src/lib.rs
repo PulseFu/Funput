@@ -88,9 +88,27 @@ pub struct TransformResult {
 pub use validation::syllable::{is_complete_syllable, is_definitely_invalid, is_valid};
 
 pub fn apply(buffer: &str, key: char, method: InputMethod, tone_style: ToneStyle) -> TransformResult {
+    apply_checked(buffer, key, method, tone_style, false)
+}
+
+/// Like [`apply`], but with the **spell-check** ("Kiểm tra chính tả") gate.
+///
+/// When `spell_check` is true, a tone / shape / stroke is only placed if the
+/// result can still become a real Vietnamese syllable; otherwise the modifier key
+/// is passed through as a literal character (UniKey-style strict diacritics).
+/// `spell_check = false` reproduces [`apply`] exactly.
+pub fn apply_checked(
+    buffer: &str,
+    key: char,
+    method: InputMethod,
+    tone_style: ToneStyle,
+    spell_check: bool,
+) -> TransformResult {
     match method {
-        InputMethod::Vni => composition::transform::apply_vni(buffer, key, tone_style),
-        InputMethod::Telex => composition::transform::apply_telex(buffer, key, tone_style),
+        InputMethod::Vni => composition::transform::apply_vni(buffer, key, tone_style, spell_check),
+        InputMethod::Telex => {
+            composition::transform::apply_telex(buffer, key, tone_style, spell_check)
+        }
     }
 }
 

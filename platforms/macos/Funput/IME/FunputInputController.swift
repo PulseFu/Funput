@@ -196,6 +196,7 @@ final class FunputInputController: IMKInputController {
         composer.setEnabled(settings.vietnameseEnabled)
         composer.setSmartRestore(settings.smartEnglishRestore)
         composer.setEagerRestore(settings.eagerRestore)
+        composer.setSpellCheck(settings.spellCheckEnabled)
 
         // Re-marshal the gõ tắt table only when it actually changed (cheap on the
         // common keystroke path where nothing changed).

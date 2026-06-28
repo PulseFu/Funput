@@ -61,6 +61,7 @@ void FunputEngine::applySettings() {
     handle_.setEnabled(effectiveEnabled_);
     handle_.setSmartRestore(settings_.smartRestore);
     handle_.setEagerRestore(settings_.eagerRestore);
+    handle_.setSpellCheck(settings_.spellCheck);
     handle_.clearShortcuts();
     for (const auto &[trigger, expansion] : settings_.shortcuts) {
         handle_.addShortcut(trigger, expansion);

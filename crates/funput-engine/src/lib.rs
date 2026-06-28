@@ -83,6 +83,13 @@ impl Engine {
         self.session.eager_restore = on;
     }
 
+    /// Toggle spell-check ("Kiểm tra chính tả"): when on, a tone / shape / stroke is
+    /// only placed if the result can still become a real Vietnamese syllable — an
+    /// invalid one (`mix` + ngã → `mĩx`) keeps the modifier key as a literal instead.
+    pub fn set_spell_check(&mut self, on: bool) {
+        self.session.spell_check = on;
+    }
+
     /// Reset composition state (buffer and raw keys) without changing enabled/method.
     pub fn clear(&mut self) {
         self.session.clear();
@@ -195,6 +202,37 @@ mod tests {
         let mut engine = Engine::new();
         engine.set_enabled(false);
         assert!(!engine.is_enabled());
+    }
+
+    /// Type a word with smart restore off so the spell-check gate is the only thing
+    /// that can alter the diacritic (eager restore would otherwise mask it).
+    fn type_word(engine: &mut Engine, word: &str) -> String {
+        engine.clear();
+        for key in word.chars() {
+            engine.process_char(key);
+        }
+        engine.buffer().to_string()
+    }
+
+    #[test]
+    fn spell_check_off_keeps_legacy_diacritic() {
+        let mut engine = Engine::new();
+        engine.set_smart_restore(false);
+        // Default: spell-check off → `tetf` composes `tèt` (huyền) as before, even
+        // though a stop coda may only carry sắc / nặng.
+        assert_eq!(type_word(&mut engine, "tetf"), "tèt");
+    }
+
+    #[test]
+    fn spell_check_on_blocks_invalid_syllable() {
+        let mut engine = Engine::new();
+        engine.set_smart_restore(false);
+        engine.set_spell_check(true);
+        // `tèt` is not a real syllable → the huyền key stays a literal: `tetf`.
+        assert_eq!(type_word(&mut engine, "tetf"), "tetf");
+        // Real syllables are unaffected.
+        assert_eq!(type_word(&mut engine, "mas"), "má");
+        assert_eq!(type_word(&mut engine, "tets"), "tét");
     }
 
     #[test]

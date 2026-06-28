@@ -24,6 +24,9 @@ struct Settings {
     bool enabled = true;
     bool smartRestore = true;
     bool eagerRestore = true;
+    // Spell-check ("Kiểm tra chính tả"): only place a diacritic that forms a valid
+    // Vietnamese syllable. Off by default.
+    bool spellCheck = false;
     Hotkey toggleHotkey = Hotkey::CtrlBacktick;
     // App identifiers (fcitx5 program() / WM_CLASS) that default to English on
     // focus. Owned by the Settings UI; the addon only reads them for matching.

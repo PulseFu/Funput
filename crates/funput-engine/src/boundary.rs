@@ -106,6 +106,7 @@ mod tests {
             tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
+            spell_check: false,
             shortcuts: HashMap::new(),
         };
         assert!(should_restore(&session));
@@ -121,6 +122,7 @@ mod tests {
             tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
+            spell_check: false,
             shortcuts: HashMap::new(),
         };
         assert!(!should_restore(&session));
@@ -136,6 +138,7 @@ mod tests {
             tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
+            spell_check: false,
             shortcuts: HashMap::new(),
         };
         assert!(!should_restore(&session));
@@ -158,6 +161,7 @@ mod tests {
             tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
+            spell_check: false,
             shortcuts: HashMap::new(),
         };
         assert!(!should_restore(&session));
@@ -174,6 +178,7 @@ mod tests {
             tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
+            spell_check: false,
             shortcuts: HashMap::new(),
         };
         assert!(!should_restore(&session));
@@ -189,6 +194,7 @@ mod tests {
             tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
+            spell_check: false,
             shortcuts: HashMap::new(),
         };
         let result = on_word_boundary(&mut session, ' ');
@@ -209,6 +215,7 @@ mod tests {
             tone_style: ToneStyle::Traditional,
             smart_restore: true,
             eager_restore: true,
+            spell_check: false,
             shortcuts: HashMap::new(),
         };
         let result = on_word_boundary(&mut session, ' ');

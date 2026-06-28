@@ -67,6 +67,10 @@ pub struct Settings {
     pub enabled: bool,
     pub smart_restore: bool,
     pub eager_restore: bool,
+    /// Spell-check ("Kiểm tra chính tả"): only place a diacritic that forms a valid
+    /// Vietnamese syllable. `#[serde(default)]` keeps older settings files loadable.
+    #[serde(default)]
+    pub spell_check: bool,
     pub toggle_hotkey: Hotkey,
     pub launch_at_login: bool,
     pub has_completed_onboarding: bool,
@@ -88,6 +92,7 @@ impl Default for Settings {
             enabled: true,
             smart_restore: true,
             eager_restore: true,
+            spell_check: false,
             toggle_hotkey: Hotkey::CtrlBacktick,
             launch_at_login: false,
             has_completed_onboarding: false,

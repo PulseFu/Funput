@@ -11,7 +11,7 @@ use crate::input_method::vni;
 use crate::input_method::KeyAction;
 use crate::unicode::tone_position::reposition_existing_tone;
 use crate::validation::syllable::{
-    validate_shape, validate_stroke, validate_tone, ModifierValidation,
+    is_definitely_invalid, validate_shape, validate_stroke, validate_tone, ModifierValidation,
 };
 use crate::{ToneStyle, TransformKind, TransformResult};
 
@@ -20,6 +20,25 @@ fn reverted(text: String) -> TransformResult {
         kind: TransformKind::Reverted,
         text,
     }
+}
+
+/// Spell-check ("Kiểm tra chính tả") gate. When `spell_check` is on, a composed
+/// modifier result that can no longer become a real Vietnamese syllable is rejected
+/// and the modifier key is passed through as a literal instead (UniKey-style strict
+/// diacritics). A no-op when spell-check is off or the modifier was not applied.
+fn spell_check_gate(
+    buffer: &str,
+    key: char,
+    spell_check: bool,
+    result: TransformResult,
+) -> TransformResult {
+    if spell_check && result.kind == TransformKind::Applied && is_definitely_invalid(&result.text) {
+        return TransformResult {
+            kind: TransformKind::Pending,
+            text: format!("{buffer}{key}"),
+        };
+    }
+    result
 }
 
 fn validation_gate(buffer: &str, key: char, validation: ModifierValidation) -> Option<TransformResult> {
@@ -37,13 +56,29 @@ fn validation_gate(buffer: &str, key: char, validation: ModifierValidation) -> O
 }
 
 /// Apply one VNI keystroke to `buffer`.
-pub(crate) fn apply_vni(buffer: &str, key: char, style: ToneStyle) -> TransformResult {
-    apply_action(buffer, key, vni::classify_key(buffer, key), style)
+pub(crate) fn apply_vni(
+    buffer: &str,
+    key: char,
+    style: ToneStyle,
+    spell_check: bool,
+) -> TransformResult {
+    apply_action(buffer, key, vni::classify_key(buffer, key), style, spell_check)
 }
 
 /// Apply one Telex keystroke to `buffer`.
-pub(crate) fn apply_telex(buffer: &str, key: char, style: ToneStyle) -> TransformResult {
-    apply_action(buffer, key, telex::classify_key(buffer, key), style)
+pub(crate) fn apply_telex(
+    buffer: &str,
+    key: char,
+    style: ToneStyle,
+    spell_check: bool,
+) -> TransformResult {
+    apply_action(
+        buffer,
+        key,
+        telex::classify_key(buffer, key),
+        style,
+        spell_check,
+    )
 }
 
 /// Apply a classified key action to `buffer`.
@@ -57,21 +92,24 @@ pub(crate) fn apply_action(
     key: char,
     action: KeyAction,
     style: ToneStyle,
+    spell_check: bool,
 ) -> TransformResult {
     match action {
         KeyAction::Stroke => {
             if let Some(text) = try_revert_stroke(buffer) {
                 return reverted(format!("{text}{key}"));
             }
-            validation_gate(buffer, key, validate_stroke(buffer))
-                .unwrap_or_else(|| apply_stroke(buffer))
+            let result = validation_gate(buffer, key, validate_stroke(buffer))
+                .unwrap_or_else(|| apply_stroke(buffer));
+            spell_check_gate(buffer, key, spell_check, result)
         }
         KeyAction::Tone(tone) => {
             if let Some(text) = try_revert_tone(buffer, tone, style) {
                 return reverted(format!("{text}{key}"));
             }
-            validation_gate(buffer, key, validate_tone(buffer))
-                .unwrap_or_else(|| apply_tone_key(buffer, tone, style))
+            let result = validation_gate(buffer, key, validate_tone(buffer))
+                .unwrap_or_else(|| apply_tone_key(buffer, tone, style));
+            spell_check_gate(buffer, key, spell_check, result)
         }
         KeyAction::Shape(shape) => {
             // Apply takes priority when an unshaped target exists, so the second
@@ -79,14 +117,16 @@ pub(crate) fn apply_action(
             // earlier `ư`. Revert only fires when there is no target to apply to
             // (e.g. `a66`, `uo77`).
             if shape_apply_target_exists(buffer, shape) {
-                return validation_gate(buffer, key, validate_shape(buffer))
+                let result = validation_gate(buffer, key, validate_shape(buffer))
                     .unwrap_or_else(|| apply_shape_key(buffer, shape));
+                return spell_check_gate(buffer, key, spell_check, result);
             }
             if let Some(text) = try_revert_shape(buffer, shape) {
                 return reverted(format!("{text}{key}"));
             }
-            validation_gate(buffer, key, validate_shape(buffer))
-                .unwrap_or_else(|| apply_shape_key(buffer, shape))
+            let result = validation_gate(buffer, key, validate_shape(buffer))
+                .unwrap_or_else(|| apply_shape_key(buffer, shape));
+            spell_check_gate(buffer, key, spell_check, result)
         }
         KeyAction::RemoveTone => match remove_tone(buffer) {
             // Tone stripped (keeps shape): `viết` + `z`/`0` → `viêt`.
@@ -123,12 +163,12 @@ mod tests {
 
     /// VNI keystroke with the default (traditional) tone style.
     fn av(buffer: &str, key: char) -> TransformResult {
-        apply_vni(buffer, key, ToneStyle::Traditional)
+        apply_vni(buffer, key, ToneStyle::Traditional, false)
     }
 
     /// Telex keystroke with the default (traditional) tone style.
     fn at(buffer: &str, key: char) -> TransformResult {
-        apply_telex(buffer, key, ToneStyle::Traditional)
+        apply_telex(buffer, key, ToneStyle::Traditional, false)
     }
 
     fn type_keys(keys: &str) -> String {
@@ -143,9 +183,47 @@ mod tests {
     fn type_keys_modern(keys: &str) -> String {
         let mut buf = String::new();
         for key in keys.chars() {
-            buf = apply_vni(&buf, key, ToneStyle::Modern).text;
+            buf = apply_vni(&buf, key, ToneStyle::Modern, false).text;
         }
         buf
+    }
+
+    /// Type a Telex sequence with the spell-check ("Kiểm tra chính tả") gate set.
+    fn type_telex(keys: &str, spell_check: bool) -> String {
+        let mut buf = String::new();
+        for key in keys.chars() {
+            buf = apply_telex(&buf, key, ToneStyle::Traditional, spell_check).text;
+        }
+        buf
+    }
+
+    #[test]
+    fn spell_check_blocks_invalid_syllable() {
+        // A stop coda (`t`) may only carry sắc / nặng. `tetf` (huyền) → `tèt` is
+        // structurally allowed but not a real syllable. With spell-check off the
+        // diacritic still lands (legacy behaviour); with it on the modifier key
+        // passes through as a literal so the raw word survives.
+        assert_eq!(type_telex("tetf", false), "tèt");
+        let blocked = apply_telex("tet", 'f', ToneStyle::Traditional, true);
+        assert_eq!(blocked.text, "tetf");
+        assert_eq!(blocked.kind, TransformKind::Pending);
+    }
+
+    #[test]
+    fn spell_check_allows_real_syllables() {
+        // Real Vietnamese syllables are never blocked, in either mode.
+        assert_eq!(type_telex("phus", true), "phú");
+        assert_eq!(type_telex("dd", true), "đ");
+        assert_eq!(type_telex("vieets", true), "viết");
+        // `tét` (sắc on a stop coda) is valid and must still compose with the gate on.
+        assert_eq!(type_telex("tets", true), "tét");
+    }
+
+    #[test]
+    fn spell_check_does_not_block_revert() {
+        // Double modifier to revert (`ass` → `as`) is a deliberate restore, not an
+        // applied diacritic, so the spell-check gate must leave it alone.
+        assert_eq!(apply_telex("á", 's', ToneStyle::Traditional, true).text, "as");
     }
 
     #[test]

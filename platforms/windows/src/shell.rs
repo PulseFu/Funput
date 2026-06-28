@@ -43,6 +43,7 @@ fn apply_to_engine(engine: &mut Engine, s: &Settings) {
     engine.set_enabled(s.enabled);
     engine.set_smart_restore(s.smart_restore);
     engine.set_eager_restore(s.eager_restore);
+    engine.set_spell_check(s.spell_check);
     push_shortcuts(engine, &s.shortcuts);
     engine.clear();
 }
@@ -228,6 +229,14 @@ pub fn set_eager_restore(on: bool) {
     with(|s| {
         s.settings.eager_restore = on;
         s.engine.set_eager_restore(on);
+        s.settings.save();
+    });
+}
+
+pub fn set_spell_check(on: bool) {
+    with(|s| {
+        s.settings.spell_check = on;
+        s.engine.set_spell_check(on);
         s.settings.save();
     });
 }

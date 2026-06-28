@@ -119,6 +119,19 @@ pub unsafe extern "C" fn funput_set_eager_restore(engine: *mut FunputEngine, on:
     }
 }
 
+/// Toggle spell-check ("Kiểm tra chính tả") — only place a diacritic when the result
+/// can still become a real Vietnamese syllable, otherwise keep the modifier key as a
+/// literal. Off by default.
+///
+/// # Safety
+/// `engine` must be a valid handle or null.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn funput_set_spell_check(engine: *mut FunputEngine, on: bool) {
+    if let Some(engine) = unsafe { engine.as_mut() } {
+        engine.inner.set_spell_check(on);
+    }
+}
+
 /// Reset composition state (buffer + raw keys), e.g. on focus change.
 ///
 /// # Safety

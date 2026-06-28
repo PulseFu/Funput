@@ -35,8 +35,18 @@ pub(super) fn page() -> PreferencesPage {
         let on = row.is_active();
         Settings::update(|s| s.eager_restore = on);
     });
+    let spell_row = SwitchRow::builder()
+        .title("Kiểm tra chính tả")
+        .subtitle("Chỉ đặt dấu khi tạo thành âm tiết tiếng Việt hợp lệ.")
+        .active(s.spell_check)
+        .build();
+    spell_row.connect_active_notify(|row| {
+        let on = row.is_active();
+        Settings::update(|s| s.spell_check = on);
+    });
     group.add(&smart_row);
     group.add(&eager_row);
+    group.add(&spell_row);
     page.add(&group);
 
     // Informational examples (read-only).

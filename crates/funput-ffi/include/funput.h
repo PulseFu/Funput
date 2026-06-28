@@ -105,6 +105,16 @@ void funput_set_smart_restore(FunputEngine *engine, bool on);
 void funput_set_eager_restore(FunputEngine *engine, bool on);
 
 /**
+ * Toggle spell-check ("Kiểm tra chính tả") — only place a diacritic when the result
+ * can still become a real Vietnamese syllable, otherwise keep the modifier key as a
+ * literal. Off by default.
+ *
+ * # Safety
+ * `engine` must be a valid handle or null.
+ */
+void funput_set_spell_check(FunputEngine *engine, bool on);
+
+/**
  * Reset composition state (buffer + raw keys), e.g. on focus change.
  *
  * # Safety
