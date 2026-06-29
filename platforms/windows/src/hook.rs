@@ -18,7 +18,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{VIRTUAL_KEY, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, GetWindowThreadProcessId, PostQuitMessage,
     SetWindowsHookExW, TranslateMessage, EVENT_SYSTEM_FOREGROUND, HC_ACTION, KBDLLHOOKSTRUCT, MSG,
-    WH_KEYBOARD_LL, WINEVENT_OUTOFCONTEXT, WM_KEYDOWN, WM_SYSKEYDOWN,
+    WH_KEYBOARD_LL, WH_MOUSE_LL, WINEVENT_OUTOFCONTEXT, WM_KEYDOWN, WM_LBUTTONDOWN, WM_MBUTTONDOWN,
+    WM_RBUTTONDOWN, WM_SYSKEYDOWN,
 };
 
 use crate::{inject, keymap, shell, tray};
@@ -43,6 +44,17 @@ pub fn run() {
             eprintln!("Funput: failed to install keyboard hook: {hook:?}");
             return;
         }
+
+        // Also watch the mouse: a click repositions the caret, which the keyboard
+        // hook can't see, so composition must be flushed (mirrors the Enter/arrow
+        // `KeyKind::Flush` path) — otherwise the next keystroke diffs against a stale
+        // word at the new caret and corrupts neighbouring text. Delivered to this
+        // thread's message pump, so it shares the engine via `shell` like the others.
+        let mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), HINSTANCE(hmod.0), 0);
+        if mouse_hook.is_err() {
+            // Non-fatal: typing still works, only mouse-click flush is unavailable.
+            eprintln!("Funput: failed to install mouse hook: {mouse_hook:?}");
+        }
         // Also watch foreground changes for per-app VI/EN auto-switch. An OUT_OF_CONTEXT
         // WinEvent hook is delivered to this thread's message queue (same pump below),
         // so its callback shares the engine via `shell` with no extra synchronization.
@@ -60,8 +72,8 @@ pub fn run() {
         // the same pump and its events can be drained right after each dispatch.
         tray::install();
 
-        // LL keyboard + WinEvent hooks (and the tray) are delivered through this
-        // thread's message queue.
+        // LL keyboard + mouse + WinEvent hooks (and the tray) are delivered through
+        // this thread's message queue.
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
             let _ = TranslateMessage(&msg);
@@ -171,6 +183,22 @@ unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARA
     CallNextHookEx(None, code, wparam, lparam)
 }
 
+/// Low-level mouse hook: a button-down click moves the text caret, so flush the
+/// in-progress composition before the next keystroke diffs against a now-stale word.
+unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if code == HC_ACTION as i32 && is_caret_moving_click(wparam.0 as u32) {
+        shell::clear();
+    }
+    CallNextHookEx(None, code, wparam, lparam)
+}
+
+/// Mouse messages that reposition the caret and so must flush composition. Move and
+/// wheel events are excluded — they don't move the text caret, and `WM_MOUSEMOVE`
+/// fires far too often to take the engine lock on.
+fn is_caret_moving_click(msg: u32) -> bool {
+    matches!(msg, WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN)
+}
+
 /// Returns true if the key should be swallowed (we injected a replacement), false
 /// to let it reach the app.
 fn handle_keydown(kbd: &KBDLLHOOKSTRUCT) -> bool {
@@ -228,5 +256,25 @@ fn handle_keydown(kbd: &KBDLLHOOKSTRUCT) -> bool {
             false
         }
         KeyKind::PassThrough => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use windows::Win32::UI::WindowsAndMessaging::{WM_MOUSEMOVE, WM_MOUSEWHEEL};
+
+    #[test]
+    fn button_down_clicks_flush_composition() {
+        assert!(is_caret_moving_click(WM_LBUTTONDOWN));
+        assert!(is_caret_moving_click(WM_RBUTTONDOWN));
+        assert!(is_caret_moving_click(WM_MBUTTONDOWN));
+    }
+
+    #[test]
+    fn move_and_wheel_do_not_flush() {
+        // Excluded so we never take the engine lock on the high-frequency move event.
+        assert!(!is_caret_moving_click(WM_MOUSEMOVE));
+        assert!(!is_caret_moving_click(WM_MOUSEWHEEL));
     }
 }
