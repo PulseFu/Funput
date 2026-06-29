@@ -16,6 +16,13 @@ struct KeyCombo: Codable, Equatable {
     private static let commandModifiers: NSEvent.ModifierFlags = [.control, .option, .command]
     private static let allModifiers: NSEvent.ModifierFlags = [.control, .option, .command, .shift]
 
+    /// Default VI/EN toggle — `⌃\` (backslash key, keyCode 42).
+    static let defaultToggle = KeyCombo(
+        keyCode: 42,
+        modifiers: NSEvent.ModifierFlags.control.rawValue,
+        label: "\\"
+    )
+
     /// Build a combo from a key-down event, or `nil` when it isn't a usable shortcut
     /// (no ⌃/⌥/⌘ held — a bare key would fire while typing).
     static func from(_ event: NSEvent) -> KeyCombo? {
@@ -32,13 +39,16 @@ struct KeyCombo: Codable, Equatable {
 
     /// Keycaps for display, e.g. `["⌃", "⇧", "Z"]`.
     var keyCaps: [String] {
-        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        Self.modifierSymbols(NSEvent.ModifierFlags(rawValue: modifiers)) + [label]
+    }
+
+    /// The modifier symbols held in `flags`, in display order (⌃⌥⇧⌘).
+    static func modifierSymbols(_ flags: NSEvent.ModifierFlags) -> [String] {
         var caps: [String] = []
         if flags.contains(.control) { caps.append("⌃") }
         if flags.contains(.option) { caps.append("⌥") }
         if flags.contains(.shift) { caps.append("⇧") }
         if flags.contains(.command) { caps.append("⌘") }
-        caps.append(label)
         return caps
     }
 

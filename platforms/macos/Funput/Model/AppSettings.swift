@@ -56,8 +56,10 @@ final class AppSettings {
     var autoCapitalizeEnabled: Bool {
         didSet { defaults.set(autoCapitalizeEnabled, forKey: Keys.autoCapitalizeEnabled) }
     }
-    var toggleShortcut: ToggleShortcut {
-        didSet { defaults.set(toggleShortcut.rawValue, forKey: Keys.toggleShortcut) }
+    /// User-recorded VI/EN toggle hotkey. Defaults to `⌃\`. Read live by
+    /// `FunputInputController`.
+    var toggleShortcut: KeyCombo {
+        didSet { defaults.set(try? JSONEncoder().encode(toggleShortcut), forKey: Keys.toggleShortcut) }
     }
     /// User-recorded hotkey to flip the word being composed VN↔raw. `nil` = off.
     /// Read live by `FunputInputController`.
@@ -113,8 +115,8 @@ final class AppSettings {
         eagerRestore = defaults.bool(forKey: Keys.eagerRestore)
         spellCheckEnabled = defaults.bool(forKey: Keys.spellCheckEnabled)
         autoCapitalizeEnabled = defaults.bool(forKey: Keys.autoCapitalizeEnabled)
-        toggleShortcut = defaults.string(forKey: Keys.toggleShortcut)
-            .flatMap(ToggleShortcut.init(rawValue:)) ?? .controlBackslash
+        toggleShortcut = defaults.data(forKey: Keys.toggleShortcut)
+            .flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) } ?? .defaultToggle
         flipShortcut = defaults.data(forKey: Keys.flipShortcut)
             .flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
         launchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
