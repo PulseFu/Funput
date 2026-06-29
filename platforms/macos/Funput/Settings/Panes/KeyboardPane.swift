@@ -26,6 +26,16 @@ struct KeyboardPane: View {
                     .labelsHidden()
                 }
             }
+
+            GlassCard {
+                SettingsRow(
+                    title: "Phím lật từ vừa gõ",
+                    subtitle: "Đổi từ đang gõ giữa tiếng Việt và chữ gốc (card ⇄ cải). Bấm rồi nhấn tổ hợp kèm ⌃/⌥/⌘.",
+                    systemImage: "arrow.2.squarepath"
+                ) {
+                    ShortcutRecorder(combo: $settings.flipShortcut)
+                }
+            }
         }
     }
 }

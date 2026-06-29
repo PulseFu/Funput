@@ -94,6 +94,14 @@ final class FunputComposer {
         funput_backspace(handle)
     }
 
+    /// Flip the word being composed between its Vietnamese form and its raw
+    /// keystrokes (`card` ⇄ `cải`), and back on a second call. Returns `true` when
+    /// the composition changed, so the caller re-renders the marked text from
+    /// `buffer()`; `false` when there is nothing to flip.
+    func flipComposing() -> Bool {
+        funput_flip_composing(handle)
+    }
+
     /// Decode a `FunputResult`'s inline `chars` (a C `uint32_t[64]`, imported as a
     /// tuple) into a `String`.
     static func output(of result: FunputResult) -> String {

@@ -59,6 +59,17 @@ final class AppSettings {
     var toggleShortcut: ToggleShortcut {
         didSet { defaults.set(toggleShortcut.rawValue, forKey: Keys.toggleShortcut) }
     }
+    /// User-recorded hotkey to flip the word being composed VN↔raw. `nil` = off.
+    /// Read live by `FunputInputController`.
+    var flipShortcut: KeyCombo? {
+        didSet {
+            if let data = flipShortcut.flatMap({ try? JSONEncoder().encode($0) }) {
+                defaults.set(data, forKey: Keys.flipShortcut)
+            } else {
+                defaults.removeObject(forKey: Keys.flipShortcut)
+            }
+        }
+    }
     var launchAtLogin: Bool {
         didSet { defaults.set(launchAtLogin, forKey: Keys.launchAtLogin) }
     }
@@ -104,6 +115,8 @@ final class AppSettings {
         autoCapitalizeEnabled = defaults.bool(forKey: Keys.autoCapitalizeEnabled)
         toggleShortcut = defaults.string(forKey: Keys.toggleShortcut)
             .flatMap(ToggleShortcut.init(rawValue:)) ?? .controlBackslash
+        flipShortcut = defaults.data(forKey: Keys.flipShortcut)
+            .flatMap { try? JSONDecoder().decode(KeyCombo.self, from: $0) }
         launchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
         showMenuBarIcon = defaults.bool(forKey: Keys.showMenuBarIcon)
         hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
@@ -153,6 +166,7 @@ final class AppSettings {
         static let spellCheckEnabled = "spellCheckEnabled"
         static let autoCapitalizeEnabled = "autoCapitalizeEnabled"
         static let toggleShortcut = "toggleShortcut"
+        static let flipShortcut = "flipShortcut"
         static let launchAtLogin = "launchAtLogin"
         static let showMenuBarIcon = "showMenuBarIcon"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
