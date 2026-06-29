@@ -209,14 +209,15 @@ FunputResult funput_backspace(FunputEngine *engine);
 
 /**
  * Flip the word being composed between its Vietnamese form and its raw keystrokes
- * (`card` ⇄ `cải`), and back on a second call. Returns `true` when the composition
- * changed — the host then re-renders the marked text from [`funput_buffer`]; `false`
- * (a no-op) when there is nothing to flip.
+ * (`card` ⇄ `cải`), and back on a second call. Returns the delete+inject the host
+ * should apply (`ACTION_SEND`), or [`FunputResult::none`] when there is nothing to
+ * flip. Hosts that show marked text can ignore the payload and re-render
+ * [`funput_buffer`] after a non-`ACTION_NONE` result.
  *
  * # Safety
  * `engine` must be a valid handle or null.
  */
-bool funput_flip_composing(FunputEngine *engine);
+FunputResult funput_flip_composing(FunputEngine *engine);
 
 #ifdef __cplusplus
 }  // extern "C"

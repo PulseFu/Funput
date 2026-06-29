@@ -171,25 +171,27 @@ impl Engine {
     }
 
     /// Flip the word being composed between its Vietnamese form and its raw
-    /// keystrokes (`card` ⇄ `cải`), and back on a second call. Returns `true` when
-    /// the composition changed — the host then re-renders [`Self::buffer`] as its
-    /// marked text. `false` (a no-op) when there is nothing to flip: no live
-    /// composition, or the word has no Vietnamese/raw distinction (`the`).
+    /// keystrokes (`card` ⇄ `cải`), and back on a second call. Returns the
+    /// delete+inject instruction ([`Action::Send`]) for hosts that type real text,
+    /// or [`Action::None`] when there is nothing to flip: no live composition, or
+    /// the word has no Vietnamese/raw distinction (`the`). Hosts that show marked
+    /// text can ignore the payload and re-render [`Self::buffer`].
     ///
     /// The choice is sticky: further keystrokes keep the chosen form and the word
     /// boundary won't English-restore it back.
-    pub fn flip_composing(&mut self) -> bool {
+    pub fn flip_composing(&mut self) -> ImeResult {
         match flip::flip(
             &self.session.buffer,
             &self.session.keys,
             &self.session.vn_form,
         ) {
-            Some((buffer, override_)) => {
-                self.session.buffer = buffer;
+            Some((new_buffer, override_)) => {
+                let (backspace, output) = diff::diff(&self.session.buffer, &new_buffer);
+                self.session.buffer = new_buffer;
                 self.session.restore_override = Some(override_);
-                true
+                ImeResult::send(backspace, output)
             }
-            None => false,
+            None => ImeResult::none(),
         }
     }
 
@@ -517,12 +519,26 @@ mod tests {
         type_word(&mut engine, "card");
         assert_eq!(engine.buffer(), "card"); // shown as raw English
 
-        assert!(engine.flip_composing());
+        // Flip → a Send that rewrites the visible word to the Vietnamese form.
+        let to_vn = engine.flip_composing();
+        assert_eq!(to_vn.action, Action::Send);
         let vn = engine.buffer().to_string();
-        assert_ne!(vn, "card"); // now the Vietnamese form
+        assert_ne!(vn, "card");
+        // The diff applied to "card" must reproduce the new buffer.
+        assert_eq!(apply_diff("card", &to_vn), vn);
 
-        assert!(engine.flip_composing());
+        let to_raw = engine.flip_composing();
+        assert_eq!(to_raw.action, Action::Send);
         assert_eq!(engine.buffer(), "card"); // back to raw
+        assert_eq!(apply_diff(&vn, &to_raw), "card");
+    }
+
+    /// Apply a `Send` result's `backspace`/`output` to `shown` — what a host that
+    /// types real text (Windows) would end up displaying.
+    fn apply_diff(shown: &str, result: &ImeResult) -> String {
+        let mut chars: Vec<char> = shown.chars().collect();
+        chars.truncate(chars.len() - result.backspace);
+        chars.into_iter().chain(result.output.chars()).collect()
     }
 
     #[test]
@@ -547,16 +563,16 @@ mod tests {
         let mut engine = Engine::new();
         type_word(&mut engine, "mas");
         assert_eq!(engine.buffer(), "má");
-        assert!(engine.flip_composing());
+        assert_eq!(engine.flip_composing().action, Action::Send);
         assert_eq!(engine.buffer(), "mas");
     }
 
     #[test]
     fn flip_is_noop_without_a_flippable_word() {
         let mut engine = Engine::new();
-        assert!(!engine.flip_composing()); // nothing composing
+        assert_eq!(engine.flip_composing().action, Action::None); // nothing composing
         type_word(&mut engine, "the"); // composes to itself — no VN/raw distinction
-        assert!(!engine.flip_composing());
+        assert_eq!(engine.flip_composing().action, Action::None);
         assert_eq!(engine.buffer(), "the");
     }
 
