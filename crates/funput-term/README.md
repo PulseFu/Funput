@@ -18,14 +18,31 @@ funput-term -- cursor
 ```
 
 - VNI `xin1 chao2` hoặc Telex `xins chaof` → **xín chào**.
-- **`Ctrl-\`**: bật/tắt tiếng Việt (trạng thái VI/EN hiện ở **tiêu đề cửa sổ** qua OSC; tự bọc
-  passthrough cho **tmux/screen**).
+- **`Ctrl-\`**: bật/tắt tiếng Việt. Trạng thái VI/EN hiện ở **tiêu đề cửa sổ** (OSC, tự bọc
+  passthrough cho **tmux/screen**) và ở **màu con trỏ** (xanh khi VI, reset khi EN) — vẫn thấy được
+  cả khi tiêu đề bị ẩn.
 - Từ không hợp lệ tiếng Việt tự khôi phục ở ranh giới từ (`card ` → `card`).
 
-**"Luôn bật":** `alias claude='funput-term -- claude'`, hoặc cấu hình terminal emulator chạy
-`funput-term -- $SHELL` → mọi app trong cửa sổ đó đều gõ được.
+**"Luôn bật":** chạy `funput-term install` để in (hoặc `--write` để ghi) đoạn alias vào shell rc, hoặc
+cấu hình terminal emulator chạy `funput-term -- $SHELL` → mọi app trong cửa sổ đó đều gõ được.
 
-CLI: `-m, --method telex|vni` (mặc định `vni`); chương trình truyền sau `--` (mặc định `$SHELL`).
+```bash
+funput-term install --alias claude --alias cursor   # in alias cho $SHELL
+funput-term install --shell zsh --alias claude --write   # ghi vào ~/.zshrc (idempotent)
+```
+
+## Cấu hình
+
+funput-term đọc file cấu hình chung của Funput: `dirs::config_dir()/Funput/settings.json` (Linux/Win
+chia sẻ luôn preferences của IME hệ thống; macOS dùng file riêng tại path chuẩn). Áp dụng được:
+`method`, `toneStyle`, `enabled`, `smartRestore`, `eagerRestore`, `spellCheck`, `autoCapitalize`,
+`shortcuts` (gõ tắt). File thiếu key vẫn nạp được (mọi key có default).
+
+**Thứ tự ưu tiên:** cờ CLI > biến môi trường > `settings.json` > mặc định.
+
+- CLI: `-m, --method telex|vni`; chương trình truyền sau `--` (mặc định `$SHELL`).
+- Env: `FUNPUT_METHOD`, `FUNPUT_TONE_STYLE`, `FUNPUT_ENABLED`, `FUNPUT_TOGGLE` (vd `ctrl-\`,
+  `ctrl-space`), `FUNPUT_CURSOR_COLOR_VI`, `FUNPUT_CONFIG` (đường dẫn file khác).
 
 ## Hành vi & phạm vi
 
@@ -60,20 +77,24 @@ engine của hệ Funput.
 
 ```
 src/
-├── main.rs    # clap CLI: -m telex|vni, [-- command]; default $SHELL; toggle Ctrl-\ (0x1c)
-├── app.rs     # forward_input (seam THUẦN, có test) + run() orchestration (spawn PTY, threads)
-├── input.rs   # THUẦN: Classifier byte → ByteKind (Printable/Control/Escape/Utf8/Toggle)
+├── main.rs    # clap CLI: [run] -m telex|vni [-- command] (default $SHELL); subcommand `install`
+├── config.rs  # THUẦN: đọc settings.json → TermConfig; overlay env; apply_to(engine); ưu tiên CLI>env>file
+├── install.rs # THUẦN: snippet(shell, aliases) (bash/zsh/fish, idempotent) + ghi vào rc file
+├── app.rs     # forward_input (seam THUẦN, có test) + run() orchestration (spawn PTY, threads, indicators)
+├── input.rs   # THUẦN: Classifier byte → ByteKind (Printable/Control/Escape/Utf8/Toggle/Paste)
 ├── inject.rs  # THUẦN: result_bytes(char, &ImeResult) → bytes (None→phím; Send/Restore→DEL×bs + UTF-8)
 ├── output.rs  # forward_output + AltScreenScanner (ESC[?1049h/l, chịu được chunk bị cắt)
-├── term.rs    # RawModeGuard (RAII), set_title (OSC)
+├── term.rs    # RawModeGuard (RAII), Mux passthrough, set_title (OSC) + set_cursor_cue (OSC 12/112)
 └── state.rs   # SharedState: enabled (toggle) + alt_screen (atomics)
 ```
 
-`input` / `inject` / `forward_input` **thuần, không I/O thật** → unit-test bằng pipe in-memory.
+`input` / `inject` / `forward_input` / `config` / `install` **thuần, không I/O thật** → unit-test bằng
+pipe in-memory hoặc input dạng chuỗi.
 
 ### Quy tắc xử lý (trong `forward_input`)
 
-- `Toggle` (`0x1c`) → `state.toggle()` + `engine.clear()` + đổi title VI/EN.
+- Khởi tạo: `config.apply_to(engine)` (method, tone, smart/eager restore, spell-check, auto-cap, gõ tắt).
+- `Toggle` (mặc định `0x1c`, đổi được qua config) → `state.toggle()` + `engine.clear()` + cập nhật title & màu con trỏ.
 - `Printable` khi đang soạn → `engine.process_char` → `result_bytes`.
 - Backspace (`0x7f`/`0x08`) khi đang soạn → `engine.on_backspace()` + forward byte (app tự xoá ký tự).
 - Tab/LF/CR (ranh giới từ) khi đang soạn → `engine.process_char(boundary)`: `None` → forward byte;
@@ -108,7 +129,8 @@ phải thư viện cho crate khác link.
 ## Phụ thuộc
 
 `funput-core` · `funput-engine` · `portable-pty` (PTY/ConPTY) · `crossterm` (raw-mode/size) · `clap`
-(CLI) · `signal-hook` (resize, chỉ unix). **Không** `funput-ffi`.
+(CLI) · `serde`/`serde_json` (đọc settings.json) · `dirs` (config path) · `signal-hook` (resize, chỉ
+unix). **Không** `funput-ffi`.
 
 ## Tests
 
@@ -121,12 +143,16 @@ cargo run    -p funput-term -- cat       # gõ "as" → "á"
 Unit test thuần (pipe in-memory): classifier (printable/control/escape/mũi tên/Alt/utf8/toggle),
 `inject` (None/Send/Restore), `forward_input` (compose `as`→`a`+DEL+`á`, `Phua`⌫`s`→`Phú`,
 `text`+Enter restore, `mas`+Enter giữ `má`, revert `mixx`→`mix`, toggle off, bracketed paste giữ
-nguyên + soạn lại sau khi dán), bracketed paste (marker bị cắt, toggle/chữ trong paste là thô, CSI
-quá dài không phải marker), alt-screen scanner (kể cả chunk bị cắt), `title_sequence` (none/tmux/screen), state.
+nguyên + soạn lại sau khi dán, config `enabled=false` không soạn, gõ tắt `vn`→`Việt Nam`), bracketed
+paste (marker bị cắt, toggle/chữ trong paste là thô, CSI quá dài không phải marker), alt-screen
+scanner (kể cả chunk bị cắt), `config` (parse camelCase, default khi thiếu key / JSON hỏng, env
+override + ưu tiên, parse phím toggle), `install` (snippet bash/zsh/fish, idempotent, detect shell),
+`title_sequence` & `cursor_cue` (none/tmux/screen), state.
 
 ## Còn làm (sau v1)
 
 - **Windows (ConPTY):** hiện chỉ Unix PTY; stack `portable-pty` đã sẵn, cần tầng input/resize cho
   Windows (TT6).
-- **Cấu hình bền:** phương thức + phím toggle đang cố định qua CLI; thêm env/file + đổi phương thức
-  lúc đang chạy.
+- **Đổi method/kiểu đặt dấu lúc đang chạy:** hiện đổi method cần khởi động lại; thêm phím lệnh xoay
+  Telex↔VNI và bật/tắt kiểu đặt dấu ngay trong phiên.
+- **Per-app profile:** dùng `excludedApps` từ settings.json để tự bật/tắt theo lệnh được bọc.
