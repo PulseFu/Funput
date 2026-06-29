@@ -5,6 +5,7 @@ use std::io::{self, Read, Write};
 use std::sync::Arc;
 use std::thread;
 
+use funput_core::InputMethod;
 use funput_engine::{Action, Engine};
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
@@ -21,6 +22,24 @@ pub struct Options {
     pub command: Vec<String>,
 }
 
+/// The user-visible composition state, reported whenever it changes so the caller
+/// can refresh the indicators (window title + cursor cue).
+#[derive(Debug, Clone, Copy)]
+pub struct Status {
+    /// VI (composing) vs EN (passthrough).
+    pub enabled: bool,
+    /// Active input method.
+    pub method: InputMethod,
+}
+
+/// The other input method — used to cycle Telex↔VNI.
+fn other_method(method: InputMethod) -> InputMethod {
+    match method {
+        InputMethod::Telex => InputMethod::Vni,
+        InputMethod::Vni => InputMethod::Telex,
+    }
+}
+
 /// Read keystrokes from `reader`, compose, and write the result bytes to `writer`.
 ///
 /// Pure of real I/O — the caller injects the reader/writer and a toggle callback,
@@ -30,17 +49,17 @@ pub fn forward_input<R, W, F>(
     mut writer: W,
     config: &TermConfig,
     state: &SharedState,
-    mut on_toggle: F,
+    mut on_status: F,
 ) -> io::Result<()>
 where
     R: Read,
     W: Write,
-    F: FnMut(bool),
+    F: FnMut(Status),
 {
     let mut engine = Engine::new();
     config.apply_to(&mut engine);
     engine.arm_capitalization();
-    let mut classifier = Classifier::new(config.toggle);
+    let mut classifier = Classifier::new(config.toggle, config.cycle_method);
     let mut buf = [0u8; 4096];
 
     loop {
@@ -53,7 +72,21 @@ where
                 ByteKind::Toggle => {
                     let enabled = state.toggle();
                     engine.clear();
-                    on_toggle(enabled);
+                    on_status(Status {
+                        enabled,
+                        method: engine.method(),
+                    });
+                }
+                // Cycle Telex↔VNI live; flush the in-progress word so it doesn't
+                // carry half-composed under the old method.
+                ByteKind::CycleMethod => {
+                    let method = other_method(engine.method());
+                    engine.set_method(method);
+                    engine.clear();
+                    on_status(Status {
+                        enabled: state.enabled(),
+                        method,
+                    });
                 }
                 ByteKind::Printable(ch) if state.composing() => {
                     let result = engine.process_char(ch);
@@ -147,7 +180,13 @@ pub fn run(opts: Options) -> io::Result<i32> {
 
     // Reflect the initial composition state in the title and cursor cue.
     let vi_color = opts.config.vi_cursor_color.clone();
-    update_indicators(opts.config.enabled, &vi_color);
+    update_indicators(
+        Status {
+            enabled: opts.config.enabled,
+            method: opts.config.method,
+        },
+        &vi_color,
+    );
 
     // Child -> terminal (own thread; ends at EOF when the child exits).
     let state_out = Arc::clone(&state);
@@ -158,10 +197,10 @@ pub fn run(opts: Options) -> io::Result<i32> {
     // Terminal -> child (detached; blocks on stdin until the process exits).
     let state_in = Arc::clone(&state);
     let config = opts.config;
-    let toggle_color = vi_color.clone();
+    let status_color = vi_color.clone();
     thread::spawn(move || {
-        let _ = forward_input(io::stdin(), writer, &config, &state_in, |on| {
-            update_indicators(on, &toggle_color);
+        let _ = forward_input(io::stdin(), writer, &config, &state_in, |status| {
+            update_indicators(status, &status_color);
         });
     });
 
@@ -174,18 +213,17 @@ pub fn run(opts: Options) -> io::Result<i32> {
     Ok(status.exit_code() as i32)
 }
 
-/// Update both VI/EN indicators (window title + cursor color) to match `enabled`.
-fn update_indicators(enabled: bool, vi_color: &str) {
+/// Update both VI/EN indicators (window title + cursor color) to match `status`.
+/// The title also shows the active method so a live Telex↔VNI switch is visible.
+fn update_indicators(status: Status, vi_color: &str) {
     let mut out = io::stdout();
-    let _ = set_title(
-        &mut out,
-        if enabled {
-            "funput · VI"
-        } else {
-            "funput · EN"
-        },
-    );
-    let _ = set_cursor_cue(&mut out, enabled, vi_color);
+    let vi_en = if status.enabled { "VI" } else { "EN" };
+    let method = match status.method {
+        InputMethod::Telex => "Telex",
+        InputMethod::Vni => "VNI",
+    };
+    let _ = set_title(&mut out, &format!("Funput · {vi_en} · {method}"));
+    let _ = set_cursor_cue(&mut out, status.enabled, vi_color);
 }
 
 #[cfg(unix)]
@@ -328,12 +366,31 @@ mod tests {
             &mut out,
             &config_for(InputMethod::Telex),
             &state,
-            |on| toggles.push(on),
+            |status| toggles.push(status.enabled),
         )
         .unwrap();
         assert_eq!(out, b"as");
         assert_eq!(toggles, vec![false]);
         assert!(!state.composing());
+    }
+
+    #[test]
+    fn cycle_method_key_switches_telex_vni() {
+        // Start Telex (cycle key Ctrl-^ = 0x1e): "as" → "á". After cycling to VNI,
+        // "as" stays "as" (s is not a VNI modifier). Status reports the new method.
+        let config = TermConfig {
+            cycle_method: Some(0x1e),
+            ..config_for(InputMethod::Telex)
+        };
+        let state = SharedState::new(true);
+        let mut out = Vec::new();
+        let mut methods = Vec::new();
+        forward_input(b"as\x1eas".as_ref(), &mut out, &config, &state, |s| {
+            methods.push(s.method)
+        })
+        .unwrap();
+        assert_eq!(reconstruct(&out), "áas");
+        assert_eq!(methods, vec![InputMethod::Vni]);
     }
 
     #[test]

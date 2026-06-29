@@ -26,6 +26,11 @@ use crate::term::DEFAULT_VI_CURSOR_COLOR;
 /// `Ctrl-\` (0x1c) — the default Vietnamese on/off toggle byte.
 pub const DEFAULT_TOGGLE: u8 = 0x1c;
 
+/// `Ctrl-^` (0x1e) — the default key to cycle Telex↔VNI. Almost never used by
+/// shells or readline, so it is safe to claim by default; set `FUNPUT_CYCLE_METHOD`
+/// to another key, or to `off`/`none` to disable.
+pub const DEFAULT_CYCLE_METHOD: Option<u8> = Some(0x1e);
+
 /// Input method as it serializes in `settings.json` (`"telex"`/`"vni"`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -112,6 +117,8 @@ pub struct TermConfig {
     pub shortcuts: Vec<(String, String)>,
     /// The byte that toggles VI/EN.
     pub toggle: u8,
+    /// The byte that cycles Telex↔VNI at runtime, or `None` to disable.
+    pub cycle_method: Option<u8>,
     /// Cursor color shown while composing (VI).
     pub vi_cursor_color: String,
 }
@@ -140,6 +147,7 @@ impl From<FileSettings> for TermConfig {
                 .map(|s| (s.trigger, s.expansion))
                 .collect(),
             toggle: DEFAULT_TOGGLE,
+            cycle_method: DEFAULT_CYCLE_METHOD,
             vi_cursor_color: DEFAULT_VI_CURSOR_COLOR.to_string(),
         }
     }
@@ -170,6 +178,18 @@ impl TermConfig {
         }
         if let Some(b) = get("FUNPUT_TOGGLE").as_deref().and_then(parse_toggle) {
             self.toggle = b;
+        }
+        if let Some(spec) = get("FUNPUT_CYCLE_METHOD") {
+            // `off`/`none`/empty disables; otherwise parse a key spec (invalid
+            // specs are ignored, keeping the previous value).
+            match spec.trim().to_ascii_lowercase().as_str() {
+                "" | "off" | "none" | "disable" | "disabled" => self.cycle_method = None,
+                _ => {
+                    if let Some(b) = parse_toggle(&spec) {
+                        self.cycle_method = Some(b);
+                    }
+                }
+            }
         }
         if let Some(c) = get("FUNPUT_CURSOR_COLOR_VI").filter(|c| !c.is_empty()) {
             self.vi_cursor_color = c;
@@ -323,6 +343,18 @@ mod tests {
         assert_eq!(c, base); // nothing set → unchanged
         let c = base.apply_env(|k| (k == "FUNPUT_METHOD").then(|| "garbage".to_string()));
         assert_eq!(c.method, InputMethod::Telex); // invalid value ignored
+    }
+
+    #[test]
+    fn cycle_method_key_defaults_and_overrides() {
+        assert_eq!(from_json("{}").cycle_method, DEFAULT_CYCLE_METHOD);
+        // A custom key spec.
+        let c =
+            from_json("{}").apply_env(|k| (k == "FUNPUT_CYCLE_METHOD").then(|| "ctrl-]".into()));
+        assert_eq!(c.cycle_method, Some(0x1d));
+        // Disabled.
+        let c = from_json("{}").apply_env(|k| (k == "FUNPUT_CYCLE_METHOD").then(|| "off".into()));
+        assert_eq!(c.cycle_method, None);
     }
 
     #[test]

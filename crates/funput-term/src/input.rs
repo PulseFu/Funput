@@ -17,6 +17,8 @@ pub enum ByteKind {
     Utf8,
     /// The configured toggle key — consume, do not forward.
     Toggle,
+    /// The configured cycle-method key (Telex↔VNI) — consume, do not forward.
+    CycleMethod,
     /// Byte inside a bracketed paste — forward raw, never compose.
     Paste,
 }
@@ -34,6 +36,8 @@ enum Phase {
 #[derive(Debug)]
 pub struct Classifier {
     toggle: u8,
+    /// Key that cycles Telex↔VNI, or `None` when disabled.
+    cycle_method: Option<u8>,
     phase: Phase,
     /// Inside a bracketed paste (`ESC[200~` … `ESC[201~`): forward content raw.
     in_paste: bool,
@@ -51,9 +55,10 @@ const PASTE_END: &[u8] = b"201";
 const MAX_CSI_PARAMS: usize = PASTE_START.len();
 
 impl Classifier {
-    pub fn new(toggle: u8) -> Self {
+    pub fn new(toggle: u8, cycle_method: Option<u8>) -> Self {
         Self {
             toggle,
+            cycle_method,
             phase: Phase::Normal,
             in_paste: false,
             params: Vec::new(),
@@ -111,6 +116,9 @@ impl Classifier {
         if byte == self.toggle {
             return ByteKind::Toggle;
         }
+        if self.cycle_method == Some(byte) {
+            return ByteKind::CycleMethod;
+        }
         match byte {
             0x20..=0x7e => ByteKind::Printable(byte as char),
             0x80..=0xff => ByteKind::Utf8,
@@ -126,7 +134,7 @@ mod tests {
     const CTRL_BACKSLASH: u8 = 0x1c;
 
     fn classify_all(toggle: u8, bytes: &[u8]) -> Vec<ByteKind> {
-        let mut c = Classifier::new(toggle);
+        let mut c = Classifier::new(toggle, None);
         bytes.iter().map(|&b| c.classify(b)).collect()
     }
 
@@ -160,9 +168,21 @@ mod tests {
     }
 
     #[test]
+    fn cycle_method_key_recognised_only_when_configured() {
+        const CTRL_CARET: u8 = 0x1e;
+        // Configured → CycleMethod; nothing else changes.
+        let mut c = Classifier::new(CTRL_BACKSLASH, Some(CTRL_CARET));
+        assert_eq!(c.classify(CTRL_CARET), ByteKind::CycleMethod);
+        assert_eq!(c.classify(CTRL_BACKSLASH), ByteKind::Toggle);
+        // Disabled → the same byte is just a control byte.
+        let mut c = Classifier::new(CTRL_BACKSLASH, None);
+        assert_eq!(c.classify(CTRL_CARET), ByteKind::Control);
+    }
+
+    #[test]
     fn arrow_key_is_escape_sequence() {
         // Up arrow = ESC [ A — all three bytes are Escape, then back to normal.
-        let mut c = Classifier::new(CTRL_BACKSLASH);
+        let mut c = Classifier::new(CTRL_BACKSLASH, None);
         assert_eq!(c.classify(0x1b), ByteKind::Escape);
         assert_eq!(c.classify(b'['), ByteKind::Escape);
         assert_eq!(c.classify(b'A'), ByteKind::Escape);
@@ -171,7 +191,7 @@ mod tests {
 
     #[test]
     fn alt_key_is_two_byte_escape() {
-        let mut c = Classifier::new(CTRL_BACKSLASH);
+        let mut c = Classifier::new(CTRL_BACKSLASH, None);
         assert_eq!(c.classify(0x1b), ByteKind::Escape);
         assert_eq!(c.classify(b'x'), ByteKind::Escape); // ESC x = Alt-x
         assert_eq!(c.classify(b'y'), ByteKind::Printable('y'));
@@ -190,7 +210,7 @@ mod tests {
     fn bracketed_paste_content_is_raw() {
         // ESC[200~as ESC[201~b : "as" is paste content (not composed), then
         // "b" composes normally once the paste ends.
-        let mut c = Classifier::new(CTRL_BACKSLASH);
+        let mut c = Classifier::new(CTRL_BACKSLASH, None);
         for &b in b"\x1b[200~" {
             assert_eq!(c.classify(b), ByteKind::Escape);
         }
@@ -206,7 +226,7 @@ mod tests {
     fn paste_marker_split_across_chunks() {
         // The marker can arrive byte-by-byte across reads; classifier state
         // persists, so paste mode still engages.
-        let mut c = Classifier::new(CTRL_BACKSLASH);
+        let mut c = Classifier::new(CTRL_BACKSLASH, None);
         for &b in b"\x1b[20" {
             c.classify(b);
         }
@@ -220,7 +240,7 @@ mod tests {
     fn toggle_and_letters_inside_paste_are_raw() {
         // Pasted content must never be interpreted as commands: the toggle key
         // and letters alike are literal Paste bytes.
-        let mut c = Classifier::new(CTRL_BACKSLASH);
+        let mut c = Classifier::new(CTRL_BACKSLASH, None);
         for &b in b"\x1b[200~" {
             c.classify(b);
         }
@@ -232,7 +252,7 @@ mod tests {
     fn over_long_csi_is_not_a_paste_marker() {
         // A CSI whose parameters exceed a marker's length must not toggle paste,
         // and its parameter buffer must stay bounded.
-        let mut c = Classifier::new(CTRL_BACKSLASH);
+        let mut c = Classifier::new(CTRL_BACKSLASH, None);
         for &b in b"\x1b[200000~" {
             c.classify(b);
         }

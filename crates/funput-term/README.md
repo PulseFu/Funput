@@ -18,9 +18,10 @@ funput-term -- cursor
 ```
 
 - VNI `xin1 chao2` hoặc Telex `xins chaof` → **xín chào**.
-- **`Ctrl-\`**: bật/tắt tiếng Việt. Trạng thái VI/EN hiện ở **tiêu đề cửa sổ** (OSC, tự bọc
-  passthrough cho **tmux/screen**) và ở **màu con trỏ** (xanh khi VI, reset khi EN) — vẫn thấy được
-  cả khi tiêu đề bị ẩn.
+- **`Ctrl-\`**: bật/tắt tiếng Việt. **`Ctrl-^`**: xoay **Telex↔VNI** ngay trong phiên (đổi/tắt qua
+  `FUNPUT_CYCLE_METHOD`). Trạng thái hiện ở **tiêu đề cửa sổ** dạng `Funput · VI · Telex` (OSC, tự bọc
+  passthrough cho **tmux/screen**), và ở **màu con trỏ** (xanh khi VI, reset khi EN) — vẫn thấy được cả
+  khi tiêu đề bị ẩn.
 - Từ không hợp lệ tiếng Việt tự khôi phục ở ranh giới từ (`card ` → `card`).
 
 **"Luôn bật":** chạy `funput-term install` để in (hoặc `--write` để ghi) đoạn alias vào shell rc, hoặc
@@ -42,7 +43,8 @@ chia sẻ luôn preferences của IME hệ thống; macOS dùng file riêng tạ
 
 - CLI: `-m, --method telex|vni`; chương trình truyền sau `--` (mặc định `$SHELL`).
 - Env: `FUNPUT_METHOD`, `FUNPUT_TONE_STYLE`, `FUNPUT_ENABLED`, `FUNPUT_TOGGLE` (vd `ctrl-\`,
-  `ctrl-space`), `FUNPUT_CURSOR_COLOR_VI`, `FUNPUT_CONFIG` (đường dẫn file khác).
+  `ctrl-space`), `FUNPUT_CYCLE_METHOD` (phím xoay Telex↔VNI; `off`/`none` để tắt),
+  `FUNPUT_CURSOR_COLOR_VI`, `FUNPUT_CONFIG` (đường dẫn file khác).
 
 ## Hành vi & phạm vi
 
@@ -81,7 +83,7 @@ src/
 ├── config.rs  # THUẦN: đọc settings.json → TermConfig; overlay env; apply_to(engine); ưu tiên CLI>env>file
 ├── install.rs # THUẦN: snippet(shell, aliases) (bash/zsh/fish, idempotent) + ghi vào rc file
 ├── app.rs     # forward_input (seam THUẦN, có test) + run() orchestration (spawn PTY, threads, indicators)
-├── input.rs   # THUẦN: Classifier byte → ByteKind (Printable/Control/Escape/Utf8/Toggle/Paste)
+├── input.rs   # THUẦN: Classifier byte → ByteKind (Printable/Control/Escape/Utf8/Toggle/CycleMethod/Paste)
 ├── inject.rs  # THUẦN: result_bytes(char, &ImeResult) → bytes (None→phím; Send/Restore→DEL×bs + UTF-8)
 ├── output.rs  # forward_output + AltScreenScanner (ESC[?1049h/l, chịu được chunk bị cắt)
 ├── term.rs    # RawModeGuard (RAII), Mux passthrough, set_title (OSC) + set_cursor_cue (OSC 12/112)
@@ -94,7 +96,8 @@ pipe in-memory hoặc input dạng chuỗi.
 ### Quy tắc xử lý (trong `forward_input`)
 
 - Khởi tạo: `config.apply_to(engine)` (method, tone, smart/eager restore, spell-check, auto-cap, gõ tắt).
-- `Toggle` (mặc định `0x1c`, đổi được qua config) → `state.toggle()` + `engine.clear()` + cập nhật title & màu con trỏ.
+- `Toggle` (mặc định `0x1c`) → `state.toggle()` + `engine.clear()` + cập nhật title & màu con trỏ.
+- `CycleMethod` (mặc định `Ctrl-^` `0x1e`, đổi/tắt qua config) → `engine.set_method` xoay Telex↔VNI + `engine.clear()` + cập nhật indicator (`Status{enabled, method}`).
 - `Printable` khi đang soạn → `engine.process_char` → `result_bytes`.
 - Backspace (`0x7f`/`0x08`) khi đang soạn → `engine.on_backspace()` + forward byte (app tự xoá ký tự).
 - Tab/LF/CR (ranh giới từ) khi đang soạn → `engine.process_char(boundary)`: `None` → forward byte;
@@ -140,8 +143,9 @@ cargo clippy -p funput-term --all-targets -- -D warnings
 cargo run    -p funput-term -- cat       # gõ "as" → "á"
 ```
 
-Unit test thuần (pipe in-memory): classifier (printable/control/escape/mũi tên/Alt/utf8/toggle),
-`inject` (None/Send/Restore), `forward_input` (compose `as`→`a`+DEL+`á`, `Phua`⌫`s`→`Phú`,
+Unit test thuần (pipe in-memory): classifier (printable/control/escape/mũi tên/Alt/utf8/toggle/cycle-method),
+`inject` (None/Send/Restore), `forward_input` (compose `as`→`a`+DEL+`á`, `Phua`⌫`s`→`Phú`, xoay
+Telex→VNI giữa dòng `as`+Ctrl-^+`as`→`áas`,
 `text`+Enter restore, `mas`+Enter giữ `má`, revert `mixx`→`mix`, toggle off, bracketed paste giữ
 nguyên + soạn lại sau khi dán, config `enabled=false` không soạn, gõ tắt `vn`→`Việt Nam`), bracketed
 paste (marker bị cắt, toggle/chữ trong paste là thô, CSI quá dài không phải marker), alt-screen
@@ -153,6 +157,6 @@ override + ưu tiên, parse phím toggle), `install` (snippet bash/zsh/fish, ide
 
 - **Windows (ConPTY):** hiện chỉ Unix PTY; stack `portable-pty` đã sẵn, cần tầng input/resize cho
   Windows (TT6).
-- **Đổi method/kiểu đặt dấu lúc đang chạy:** hiện đổi method cần khởi động lại; thêm phím lệnh xoay
-  Telex↔VNI và bật/tắt kiểu đặt dấu ngay trong phiên.
+- **Đổi kiểu đặt dấu lúc đang chạy:** đã có xoay Telex↔VNI (`Ctrl-^`); còn thiếu phím bật/tắt
+  kiểu đặt dấu (traditional/modern) ngay trong phiên.
 - **Per-app profile:** dùng `excludedApps` từ settings.json để tự bật/tắt theo lệnh được bọc.

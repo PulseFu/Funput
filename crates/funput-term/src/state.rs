@@ -24,6 +24,11 @@ impl SharedState {
         self.enabled.load(Ordering::Relaxed) && !self.alt_screen.load(Ordering::Relaxed)
     }
 
+    /// The user's VI/EN toggle, independent of alt-screen — used for the indicator.
+    pub fn enabled(&self) -> bool {
+        self.enabled.load(Ordering::Relaxed)
+    }
+
     /// Flip the toggle; returns the new value.
     pub fn toggle(&self) -> bool {
         !self.enabled.fetch_xor(true, Ordering::Relaxed)

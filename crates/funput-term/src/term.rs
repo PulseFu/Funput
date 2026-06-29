@@ -105,8 +105,8 @@ mod tests {
     #[test]
     fn plain_title_is_bare_osc() {
         assert_eq!(
-            title_sequence("funput · VI", Mux::None),
-            "\x1b]0;funput · VI\x07"
+            title_sequence("Funput · VI", Mux::None),
+            "\x1b]0;Funput · VI\x07"
         );
     }
 
