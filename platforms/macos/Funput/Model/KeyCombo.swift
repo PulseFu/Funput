@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 /// A user-recorded keyboard shortcut: a key plus its ⌃/⌥/⌘/⇧ modifiers.
 ///
@@ -66,5 +67,36 @@ struct KeyCombo: Codable, Equatable {
     private static let specialKeyNames: [UInt16: String] = [
         49: "Space", 36: "↩", 48: "⇥", 51: "⌫", 53: "⎋",
         123: "←", 124: "→", 125: "↓", 126: "↑",
+    ]
+}
+
+extension KeyCombo {
+    /// The SwiftUI shortcut for menu annotations (and app-level handling while a
+    /// Funput window is focused). `nil` when the key can't be represented.
+    var keyboardShortcut: KeyboardShortcut? {
+        keyEquivalent.map { KeyboardShortcut($0, modifiers: eventModifiers) }
+    }
+
+    private var eventModifiers: EventModifiers {
+        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
+        var mods: EventModifiers = []
+        if flags.contains(.control) { mods.insert(.control) }
+        if flags.contains(.option) { mods.insert(.option) }
+        if flags.contains(.shift) { mods.insert(.shift) }
+        if flags.contains(.command) { mods.insert(.command) }
+        return mods
+    }
+
+    private var keyEquivalent: KeyEquivalent? {
+        if let special = Self.specialKeyEquivalents[keyCode] { return special }
+        // Printable keys: `label` is the character; lowercase letters so Shift is
+        // expressed via the modifiers, not the case.
+        guard let ch = label.first, ch != "•" else { return nil }
+        return KeyEquivalent(Character(ch.lowercased()))
+    }
+
+    private static let specialKeyEquivalents: [UInt16: KeyEquivalent] = [
+        49: .space, 36: .return, 48: .tab, 51: .delete, 53: .escape,
+        123: .leftArrow, 124: .rightArrow, 125: .downArrow, 126: .upArrow,
     ]
 }
