@@ -15,6 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let connectionName = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String
             ?? "Funput_1_Connection"
         server = IMKServer(name: connectionName, bundleIdentifier: Bundle.main.bundleIdentifier)
+        // Make "Funput" findable in Spotlight on no-admin installs (see type docs).
+        LauncherInstaller.ensureInstalled()
     }
 
     /// Handle `funput://` URLs. The /Applications launcher stub opens

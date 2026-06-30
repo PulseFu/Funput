@@ -50,15 +50,10 @@ let url = URL(fileURLWithPath: CommandLine.arguments[1]) as CFURL
 exit(TISRegisterInputSource(url) == noErr ? 0 : 1)
 SWIFT
 
-# Build + install the Spotlight launcher stub into /Applications (ad-hoc signed),
-# so "Funput" is findable in Spotlight locally too. It just opens funput://settings.
-LAUNCHER_BUILD="$DERIVED/launcher"
-"$PROJECT_DIR/scripts/build-launcher.sh" "$LAUNCHER_BUILD" "0.0.0" "-" >/dev/null
-rm -rf "/Applications/Funput.app"
-cp -R "$LAUNCHER_BUILD/Funput.app" "/Applications/Funput.app"
-"$LSR" -f "/Applications/Funput.app" 2>/dev/null || true
-
-# Launch so the IMKServer comes up; it then runs as a background agent.
+# Launch so the IMKServer comes up; it then runs as a background agent. On first
+# launch it self-installs the Spotlight launcher stub into ~/Applications (the
+# launcher is embedded in Resources by the Xcode build phase — see
+# LauncherInstaller.swift, scripts/embed-launcher.sh).
 open "$DEST/Funput.app"
 
 echo "Done. If this is the first install, add Funput in"

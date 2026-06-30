@@ -165,29 +165,19 @@ if ! codesign -dvv "$APP" 2>&1 | grep -q 'flags=.*runtime'; then
 fi
 lipo -info "$APP/Contents/MacOS/Funput"
 
-# --- 5b. Build the /Applications launcher stub ----------------------------------
-# A tiny normal app so users can find "Funput" in Spotlight — the input method in
-# /Library/Input Methods is an LSUIElement agent that Spotlight does not surface.
-# It just opens funput://settings. Signed with the same Developer ID + hardened
-# runtime so it notarizes alongside the app below.
-echo "Building launcher…"
-LAUNCHER="$OUT/launcher/Funput.app"
-"$PROJECT_DIR/scripts/build-launcher.sh" "$OUT/launcher" "$VERSION" "$SIGN_ID" >/dev/null
-codesign --verify --strict --verbose=2 "$LAUNCHER"
+# The Spotlight launcher stub is embedded in the app's Resources by the Xcode
+# "Embed Launcher" build phase (see scripts/embed-launcher.sh) — already signed
+# with this build's Developer ID + hardened runtime, so it notarizes as nested
+# code below. We reuse that exact bundle for the /Applications payload in step 7.
+LAUNCHER="$APP/Contents/Resources/Funput.app"
 
-# --- 6. Notarize the app + launcher + staple (so they validate offline) ---------
+# --- 6. Notarize the app + staple (so the copied-out app validates offline) -----
 if [ -z "$DRY_RUN" ]; then
     echo "Notarizing app…"
     ditto -c -k --keepParent "$APP" "$OUT/Funput-app.zip"
     notarize "$OUT/Funput-app.zip"
     xcrun stapler staple "$APP"
     rm -f "$OUT/Funput-app.zip"
-
-    echo "Notarizing launcher…"
-    ditto -c -k --keepParent "$LAUNCHER" "$OUT/Funput-launcher.zip"
-    notarize "$OUT/Funput-launcher.zip"
-    xcrun stapler staple "$LAUNCHER"
-    rm -f "$OUT/Funput-launcher.zip"
 fi
 
 # --- 7. Build the signed .pkg installer -----------------------------------------
@@ -206,7 +196,9 @@ COMPONENT="$OUT/Funput-component.pkg"
 rm -rf "$PKGROOT" "$SCRIPTS"
 mkdir -p "$PKGROOT/Library/Input Methods" "$PKGROOT/Applications" "$SCRIPTS"
 cp -R "$APP" "$PKGROOT/Library/Input Methods/Funput.app"
-# Spotlight-findable launcher (step 5b) — installed into /Applications.
+# Spotlight-findable launcher — installed into /Applications system-wide. (The IME
+# also self-installs it into ~/Applications on first launch when absent, which
+# covers the no-admin .app.zip install; here the .pkg places it directly.)
 cp -R "$LAUNCHER" "$PKGROOT/Applications/Funput.app"
 cp "$PROJECT_DIR/scripts/pkg/postinstall" "$SCRIPTS/postinstall"
 chmod +x "$SCRIPTS/postinstall"

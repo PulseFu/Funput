@@ -10,9 +10,13 @@
 #
 #   build-launcher.sh <out-dir> <version> [sign-identity]
 #
-# Writes <out-dir>/Funput.app. sign-identity defaults to "-" (ad-hoc); pass
-# "Developer ID Application" for a release build (adds hardened runtime + timestamp
-# so the bundle can be notarized).
+# Writes <out-dir>/Funput.app. sign-identity defaults to "-" (ad-hoc). Signing
+# adapts to the identity so the launcher is valid as nested code of the app:
+#   "-" / empty          -> ad-hoc (no hardened runtime, no timestamp)
+#   "Developer ID …"     -> hardened runtime + secure timestamp (notarizable)
+#   anything else (dev)  -> hardened runtime, no network timestamp
+# Normally invoked from the Xcode "Embed Launcher" build phase (embed-launcher.sh),
+# which passes the build's own code-signing identity.
 set -eu
 
 OUT="$1"
@@ -55,12 +59,14 @@ if [ -f "$ICON_SRC" ] && command -v iconutil >/dev/null 2>&1; then
     rm -rf "$ICONSET"
 fi
 
-# Sign. Developer ID builds get the hardened runtime + secure timestamp (required
-# to notarize); ad-hoc ("-") builds skip the timestamp.
-if [ "$SIGN_ID" = "-" ]; then
-    codesign --force --sign "-" "$APP"
-else
-    codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$APP"
-fi
+# Sign (see header for the per-identity policy).
+case "$SIGN_ID" in
+    "" | "-")
+        codesign --force --sign "-" "$APP" ;;
+    "Developer ID"*)
+        codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$APP" ;;
+    *)
+        codesign --force --options runtime --sign "$SIGN_ID" "$APP" ;;
+esac
 
 echo "$APP"
