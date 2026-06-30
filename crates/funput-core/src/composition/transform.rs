@@ -296,6 +296,17 @@ mod tests {
     }
 
     #[test]
+    fn telex_horn_placed_after_trailing_vowel() {
+        // The horn (`w`) can be placed anywhere, including after the whole rhyme:
+        // `moiwf` → `mời` works the same as `mowif`. Likewise the tone key is
+        // already position-free, so both orders land the huyền on the right vowel.
+        assert_eq!(type_telex("moiwf", false), "mời");
+        assert_eq!(type_telex("mowif", false), "mời");
+        assert_eq!(type_telex("doiwf", false), "dời");
+        assert_eq!(type_telex("nguoiwf", false), "người");
+    }
+
+    #[test]
     fn reposition_and_complex() {
         assert_eq!(type_keys("hoa2"), "hòa");
         assert_eq!(type_keys("thuy3"), "thủy");

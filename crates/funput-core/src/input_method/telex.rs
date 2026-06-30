@@ -76,33 +76,37 @@ fn classify_w(buffer: &str) -> Option<KeyAction> {
 
     let last = last_char(buffer)?;
 
-    // `w` typed after the coda (last char is a consonant): place the shape on the
-    // nucleus wherever it sits, so the breve/horn key works anywhere in the
-    // syllable (`lam` + `w` → `lăm`, `con` + `w` → `cơn`), mirroring free-position
-    // `đ`. A Vietnamese syllable never has a `w` after the coda, so this is
-    // unambiguous. The `uo` horn compound is already handled above; breve (only
-    // `a` takes it) is tried before horn (`o`/`u`).
-    if !is_vowel(last) {
-        if shape_target_index(buffer, VowelShape::Breve).is_some() {
+    // Adjacent rules on the last vowel, tried first so an immediately-preceding
+    // vowel still wins: revert a shaped vowel (`ơ` + `w` → `o`), or shape a plain
+    // `a`/`o`/`u` typed right before `w`. Circumflex is never reverted by `w` and
+    // returns early so an `ô` is left literal rather than re-horned below.
+    if is_vowel(last) {
+        if let Some(shape) = shape_on_vowel(last) {
+            return match shape {
+                VowelShape::Breve | VowelShape::Horn => Some(KeyAction::Shape(shape)),
+                VowelShape::Circumflex => None,
+            };
+        }
+        if is_plain_vowel(last, 'a') {
             return Some(KeyAction::Shape(VowelShape::Breve));
         }
-        if shape_target_index(buffer, VowelShape::Horn).is_some() {
+        if is_plain_vowel(last, 'o') || is_plain_vowel(last, 'u') {
             return Some(KeyAction::Shape(VowelShape::Horn));
         }
-        return None;
     }
 
-    if let Some(shape) = shape_on_vowel(last) {
-        return match shape {
-            VowelShape::Breve | VowelShape::Horn => Some(KeyAction::Shape(shape)),
-            VowelShape::Circumflex => None,
-        };
-    }
-
-    if is_plain_vowel(last, 'a') {
+    // Free position: place the breve/horn on whichever nucleus vowel can receive
+    // it, wherever it sits — so the key works after the coda (`con` + `w` → `cơn`)
+    // or after a trailing vowel that can't itself take the shape (`moi` + `w` →
+    // `mơi`, `doi` + `w` → `dơi`), not only on a plain `a`/`o`/`u` typed right
+    // before `w`. This lets the user place the horn/breve at any point in the
+    // syllable, like VNI's position-free 7/8. A Vietnamese syllable never holds a
+    // literal `w`, so this is unambiguous; with no shapeable nucleus (`eng`) it
+    // returns None and `w` stays literal. Breve (only `a` takes it) before horn.
+    if shape_target_index(buffer, VowelShape::Breve).is_some() {
         return Some(KeyAction::Shape(VowelShape::Breve));
     }
-    if is_plain_vowel(last, 'o') || is_plain_vowel(last, 'u') {
+    if shape_target_index(buffer, VowelShape::Horn).is_some() {
         return Some(KeyAction::Shape(VowelShape::Horn));
     }
 
@@ -281,6 +285,22 @@ mod tests {
         // No shapeable nucleus → `w` is a literal.
         assert_eq!(classify_key("eng", 'w'), KeyAction::Normal);
         assert_eq!(classify_key("ng", 'w'), KeyAction::Normal);
+    }
+
+    #[test]
+    fn classify_w_after_trailing_vowel() {
+        // `w` typed after a trailing vowel that can't take the shape still horns the
+        // earlier nucleus vowel — so the horn can be placed last, `moi` + `w` →
+        // `mơi` (the user types `moiwf` for `mời`, not only `mowif`).
+        assert_eq!(classify_key("moi", 'w'), KeyAction::Shape(VowelShape::Horn));
+        assert_eq!(classify_key("doi", 'w'), KeyAction::Shape(VowelShape::Horn));
+        assert_eq!(classify_key("coi", 'w'), KeyAction::Shape(VowelShape::Horn));
+        // Breve target wins over horn when present (only `a` takes the breve).
+        assert_eq!(classify_key("oa", 'w'), KeyAction::Shape(VowelShape::Breve));
+        // A plain vowel typed right before `w` still shapes itself (adjacent rule).
+        assert_eq!(classify_key("mo", 'w'), KeyAction::Shape(VowelShape::Horn));
+        // `i` alone has no shapeable vowel → literal.
+        assert_eq!(classify_key("mi", 'w'), KeyAction::Normal);
     }
 
     #[test]
