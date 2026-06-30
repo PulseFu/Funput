@@ -10,10 +10,16 @@
 # already in place. So: no `set -e`, every step guarded, always exit 0.
 
 APP="/Library/Input Methods/Funput.app"
+LAUNCHER="/Applications/Funput.app"
 LSR="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
 # Register the bundle system-wide (LaunchServices keys input sources by bundle id).
 "$LSR" -f "$APP" 2>/dev/null || true
+
+# Register the /Applications launcher and nudge Spotlight to index it, so a user
+# who searches "Funput" finds it (the input method above is not Spotlight-visible).
+"$LSR" -f "$LAUNCHER" 2>/dev/null || true
+/usr/bin/mdimport "$LAUNCHER" 2>/dev/null || true
 
 # Best-effort: refresh + launch inside the console user's GUI session so it shows
 # up immediately. Skipped cleanly when there is no GUI user (SSH / login window).

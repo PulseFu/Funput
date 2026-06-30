@@ -15,6 +15,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let connectionName = Bundle.main.infoDictionary?["InputMethodConnectionName"] as? String
             ?? "Funput_1_Connection"
         server = IMKServer(name: connectionName, bundleIdentifier: Bundle.main.bundleIdentifier)
+        // Make "Funput" findable in Spotlight on no-admin installs (see type docs).
+        LauncherInstaller.ensureInstalled()
+    }
+
+    /// Handle `funput://` URLs. The /Applications launcher stub opens
+    /// `funput://settings` so users who find "Funput" in Spotlight reach Settings
+    /// (the input method bundle itself isn't surfaced by Spotlight). Bumping the
+    /// request is observed by the menu bar label, which opens the window — this
+    /// works whether we were already running or were just cold-launched by the URL.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard urls.contains(where: { $0.scheme == "funput" }) else { return }
+        AppSettings.shared.openSettingsRequest &+= 1
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 
@@ -78,6 +91,14 @@ private struct MenuBarLabel: View {
                 if !settings.hasCompletedOnboarding {
                     openWindow(id: WindowID.onboarding)
                 }
+            }
+            // A funput://settings request (from the /Applications launcher) opens
+            // Settings. `initial: true` also covers a cold launch where the URL
+            // bumped the counter before this label first appeared.
+            .onChange(of: settings.openSettingsRequest, initial: true) { _, count in
+                guard count > 0 else { return }
+                openWindow(id: WindowID.settings)
+                NSApp.activate(ignoringOtherApps: true)
             }
     }
 }

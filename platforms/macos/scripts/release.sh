@@ -165,6 +165,12 @@ if ! codesign -dvv "$APP" 2>&1 | grep -q 'flags=.*runtime'; then
 fi
 lipo -info "$APP/Contents/MacOS/Funput"
 
+# The Spotlight launcher stub is embedded in the app's Resources by the Xcode
+# "Embed Launcher" build phase (see scripts/embed-launcher.sh) — already signed
+# with this build's Developer ID + hardened runtime, so it notarizes as nested
+# code below. We reuse that exact bundle for the /Applications payload in step 7.
+LAUNCHER="$APP/Contents/Resources/Funput.app"
+
 # --- 6. Notarize the app + staple (so the copied-out app validates offline) -----
 if [ -z "$DRY_RUN" ]; then
     echo "Notarizing app…"
@@ -178,17 +184,22 @@ fi
 # A double-clickable .pkg replaces the old "Install Funput.command": unlike a flat
 # shell script (which cannot carry a notarization ticket and so always trips
 # Gatekeeper), a .pkg is signed with "Developer ID Installer", notarized, and
-# stapled — Installer.app opens it with no warning. The payload installs Funput.app
-# directly into /Library/Input Methods (a valid, system-wide input-method search
-# location), so the install is correct from the payload alone; the postinstall only
-# does best-effort LaunchServices registration (see scripts/pkg/postinstall).
+# stapled — Installer.app opens it with no warning. The payload installs the input
+# method into /Library/Input Methods (a valid, system-wide input-method search
+# location) and the launcher stub into /Applications, so the install is correct
+# from the payload alone; the postinstall only does best-effort LaunchServices
+# registration (see scripts/pkg/postinstall).
 echo "Building .pkg…"
 PKGROOT="$OUT/pkgroot"
 SCRIPTS="$OUT/pkgscripts"
 COMPONENT="$OUT/Funput-component.pkg"
 rm -rf "$PKGROOT" "$SCRIPTS"
-mkdir -p "$PKGROOT/Library/Input Methods" "$SCRIPTS"
+mkdir -p "$PKGROOT/Library/Input Methods" "$PKGROOT/Applications" "$SCRIPTS"
 cp -R "$APP" "$PKGROOT/Library/Input Methods/Funput.app"
+# Spotlight-findable launcher — installed into /Applications system-wide. (The IME
+# also self-installs it into ~/Applications on first launch when absent, which
+# covers the no-admin .app.zip install; here the .pkg places it directly.)
+cp -R "$LAUNCHER" "$PKGROOT/Applications/Funput.app"
 cp "$PROJECT_DIR/scripts/pkg/postinstall" "$SCRIPTS/postinstall"
 chmod +x "$SCRIPTS/postinstall"
 

@@ -98,6 +98,11 @@ final class AppSettings {
     /// the table to the engine (instead of doing it on every keystroke). Not persisted.
     @ObservationIgnored private(set) var shortcutsRevision = 0
 
+    /// Bumped when an external `funput://settings` request arrives (the /Applications
+    /// launcher, opened from Spotlight). Observed by the menu bar label, which opens
+    /// the Settings window. Not persisted.
+    var openSettingsRequest = 0
+
     @ObservationIgnored private let defaults: UserDefaults
 
     private init(defaults: UserDefaults = .standard) {

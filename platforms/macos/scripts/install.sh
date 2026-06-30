@@ -50,7 +50,10 @@ let url = URL(fileURLWithPath: CommandLine.arguments[1]) as CFURL
 exit(TISRegisterInputSource(url) == noErr ? 0 : 1)
 SWIFT
 
-# Launch so the IMKServer comes up; it then runs as a background agent.
+# Launch so the IMKServer comes up; it then runs as a background agent. On first
+# launch it self-installs the Spotlight launcher stub into ~/Applications (the
+# launcher is embedded in Resources by the Xcode build phase — see
+# LauncherInstaller.swift, scripts/embed-launcher.sh).
 open "$DEST/Funput.app"
 
 echo "Done. If this is the first install, add Funput in"

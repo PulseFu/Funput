@@ -86,6 +86,7 @@
 				5F0EF48A2FE2FEF40036210A /* Sources */,
 				5F0EF48B2FE2FEF40036210A /* Frameworks */,
 				5F0EF48C2FE2FEF40036210A /* Resources */,
+				5FA0000000000000000000B1 /* Embed Launcher */,
 			);
 			buildRules = (
 			);
@@ -170,6 +171,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"$SRCROOT/scripts/build-ffi.sh\"\n";
+		};
+		5FA0000000000000000000B1 /* Embed Launcher */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Launcher/main.swift",
+				"$(SRCROOT)/Launcher/Info.plist",
+				"$(SRCROOT)/scripts/build-launcher.sh",
+			);
+			name = "Embed Launcher";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$SRCROOT/scripts/embed-launcher.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
