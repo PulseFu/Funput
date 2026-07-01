@@ -335,6 +335,21 @@ mod tests {
     }
 
     #[test]
+    fn telex_ua_horn_keeps_tone_and_reverts() {
+        // #2: a tone already on the `u` is kept when the horn lands (`úa` → `ứa`),
+        // so `ua` + tone + `w` composes the same as `ua` + `w` + tone.
+        assert_eq!(type_telex("uasw", false), "ứa");
+        assert_eq!(type_telex("uaws", false), "ứa");
+        assert_eq!(type_telex("cuawr", false), "cửa"); // cửa (door)
+        // #1: a repeat `w` reverts the horn even when it sits on `ư` (not the last
+        // char), giving back `ua` plus the literal `w`, not a stray breve on `a`.
+        assert_eq!(type_telex("nuaww", false), "nuaw");
+        assert_eq!(type_telex("muaww", false), "muaw");
+        // `qu` glide is still breve-and-revert on the `a`, untouched by the `ua` rule.
+        assert_eq!(type_telex("quaww", false), "quaw");
+    }
+
+    #[test]
     fn reposition_and_complex() {
         assert_eq!(type_keys("hoa2"), "hòa");
         assert_eq!(type_keys("thuy3"), "thủy");
