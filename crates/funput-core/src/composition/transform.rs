@@ -307,6 +307,20 @@ mod tests {
     }
 
     #[test]
+    fn telex_ua_rhyme_horns_u() {
+        // `w` after a plain `ua` forms the `ưa` rhyme (horn on `u`), so the horn can
+        // be placed last: `nuawx` → `nữa`, same as `nuwax`.
+        assert_eq!(type_telex("nuawx", false), "nữa");
+        assert_eq!(type_telex("nuwax", false), "nữa");
+        assert_eq!(type_telex("muaw", false), "mưa");
+        assert_eq!(type_telex("dduaw", false), "đưa");
+        // `qu` glide is untouched: `a` takes the breve (`quăng`).
+        assert_eq!(type_telex("quawng", false), "quăng");
+        // The plain `ua` rhyme (no `w`) still composes normally (`múa`, not `mứa`).
+        assert_eq!(type_telex("muas", false), "múa");
+    }
+
+    #[test]
     fn reposition_and_complex() {
         assert_eq!(type_keys("hoa2"), "hòa");
         assert_eq!(type_keys("thuy3"), "thủy");

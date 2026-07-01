@@ -69,6 +69,22 @@ fn is_plain_vowel(c: char, base: char) -> bool {
         && shape_on_vowel(c).is_none()
 }
 
+/// Whether the buffer ends in a plain `ua` whose `u` should take the horn, forming
+/// the `ưa` rhyme (`mua` + `w` → `mưa`, `nua` + `w` → `nưa`). Vietnamese has no
+/// `uă` rhyme, so `w` after `ua` horns the `u` rather than putting a breve on the
+/// `a`. The `u` in a `qu` glide is excluded — there it is part of the onset and the
+/// `a` takes the breve (`qua` + `w` → `quă`), mirroring the `uo` → `ươ` rule.
+fn ends_with_hornable_ua(buffer: &str) -> bool {
+    let mut rev = buffer.chars().rev();
+    if !rev.next().is_some_and(|a| is_plain_vowel(a, 'a')) {
+        return false;
+    }
+    if !rev.next().is_some_and(|u| is_plain_vowel(u, 'u')) {
+        return false;
+    }
+    !matches!(rev.next(), Some('q' | 'Q'))
+}
+
 fn classify_w(buffer: &str) -> Option<KeyAction> {
     if uo_pair_in_vowel_cluster(buffer).is_some() {
         return Some(KeyAction::Shape(VowelShape::Horn));
@@ -88,7 +104,13 @@ fn classify_w(buffer: &str) -> Option<KeyAction> {
             };
         }
         if is_plain_vowel(last, 'a') {
-            return Some(KeyAction::Shape(VowelShape::Breve));
+            // Plain `ua` horns the `u` (→ `ưa`); a bare/`oa` `a` takes the breve.
+            let shape = if ends_with_hornable_ua(buffer) {
+                VowelShape::Horn
+            } else {
+                VowelShape::Breve
+            };
+            return Some(KeyAction::Shape(shape));
         }
         if is_plain_vowel(last, 'o') || is_plain_vowel(last, 'u') {
             return Some(KeyAction::Shape(VowelShape::Horn));
@@ -301,6 +323,22 @@ mod tests {
         assert_eq!(classify_key("mo", 'w'), KeyAction::Shape(VowelShape::Horn));
         // `i` alone has no shapeable vowel → literal.
         assert_eq!(classify_key("mi", 'w'), KeyAction::Normal);
+    }
+
+    #[test]
+    fn classify_w_on_ua_horns_the_u() {
+        // Plain `ua` + `w` forms the `ưa` rhyme by horning the `u`, not a breve on
+        // the `a` (there is no `uă` rhyme): `nua` + `w` → `nưa` (→ `nữa`),
+        // `mua` + `w` → `mưa`, `ngua` + `w` → `ngưa`.
+        assert_eq!(classify_key("nua", 'w'), KeyAction::Shape(VowelShape::Horn));
+        assert_eq!(classify_key("mua", 'w'), KeyAction::Shape(VowelShape::Horn));
+        assert_eq!(classify_key("ngua", 'w'), KeyAction::Shape(VowelShape::Horn));
+        assert_eq!(classify_key("ua", 'w'), KeyAction::Shape(VowelShape::Horn));
+        // `qu` glide: the `u` is part of the onset, so the `a` takes the breve.
+        assert_eq!(classify_key("qua", 'w'), KeyAction::Shape(VowelShape::Breve));
+        assert_eq!(classify_key("Qua", 'w'), KeyAction::Shape(VowelShape::Breve));
+        // `oa` still breves the `a` (`xoăn`), unaffected by the `ua` rule.
+        assert_eq!(classify_key("hoa", 'w'), KeyAction::Shape(VowelShape::Breve));
     }
 
     #[test]
